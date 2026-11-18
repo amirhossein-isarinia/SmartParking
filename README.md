@@ -2,18 +2,6 @@
 
 A Smart Parking Management System developed with C# and .NET 10, featuring a console application and an interactive web dashboard.
 
-## About the Developer
-
-**Amirhossein Sarinia**
-
-Software Developer focused on C#, .NET, Object-Oriented Programming, and practical software engineering.
-
-This project was designed and developed by Amirhossein Sarinia to demonstrate the application of object-oriented programming principles and modern .NET technologies in a real-world parking management system.
-
-The implementation emphasizes structured code, reusable components, separation of responsibilities, and practical business logic.
-
-GitHub: [@amirhossein-isarinia](https://github.com/amirhossein-isarinia)
-
 ## Project Overview
 
 SmartParking provides two applications that use the same core parking management logic:
