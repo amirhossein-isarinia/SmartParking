@@ -1,0 +1,19 @@
+<Modal Title="@Title" OnClose="OnCancel">
+    <ChildContent>@ChildContent</ChildContent>
+    <Footer>
+        <button type="button" class="btn btn-ghost" @onclick="OnCancel" disabled="@Busy">انصراف</button>
+        <button type="button" class="btn @ConfirmClass" @onclick="OnConfirm" disabled="@Busy">
+            @(Busy ? "در حال ثبت..." : ConfirmText)
+        </button>
+    </Footer>
+</Modal>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter] public string ConfirmText { get; set; } = "تأیید";
+    [Parameter] public string ConfirmClass { get; set; } = "btn-primary";
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public EventCallback OnConfirm { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

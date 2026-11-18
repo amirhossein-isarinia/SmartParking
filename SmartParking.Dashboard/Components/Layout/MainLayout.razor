@@ -1,0 +1,40 @@
+@inherits LayoutComponentBase
+@inject UiSettings Settings
+@inject NavigationManager Nav
+@implements IDisposable
+
+<div class="shell @(_navOpen ? "nav-open" : "")">
+    <Sidebar OnNavigate="CloseNav" />
+    <div class="scrim" @onclick="CloseNav" aria-hidden="true"></div>
+
+    <div class="main">
+        <Topbar OnMenu="ToggleNav" />
+        <main class="content" id="main-content">
+            @Body
+        </main>
+    </div>
+</div>
+
+<ReceiptHost />
+
+@code {
+    private bool _navOpen;
+
+    protected override void OnInitialized() => Nav.LocationChanged += OnLocationChanged;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Settings.LoadAsync();
+    }
+
+    private void ToggleNav() => _navOpen = !_navOpen;
+    private void CloseNav() => _navOpen = false;
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        _navOpen = false;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => Nav.LocationChanged -= OnLocationChanged;
+}

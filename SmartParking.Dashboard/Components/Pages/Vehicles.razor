@@ -1,0 +1,181 @@
+@page "/vehicles"
+@inherits LiveComponentBase
+@inject VehicleService VehicleSvc
+@inject UiSettings Settings
+@inject NavigationManager Nav
+
+<PageTitle>وسایل نقلیه حاضر | SmartParking</PageTitle>
+
+<PageHeader Title="وسایل نقلیه حاضر" Subtitle="فهرست زنده‌ی وسایل موجود در پارکینگ">
+    <Actions>
+        <a class="btn btn-primary" href="vehicles/entry"><Icon Name="login" Size="16" />ثبت ورود جدید</a>
+    </Actions>
+</PageHeader>
+
+<section class="panel">
+    <div class="toolbar no-print">
+        <label class="field grow">
+            <span class="field-label">جست‌وجو</span>
+            <span class="input-icon">
+                <Icon Name="search" Size="18" />
+                <input class="input" type="search" placeholder="پلاک یا نام مالک" @bind="_search" @bind:event="oninput" @bind:after="ResetPage" />
+            </span>
+        </label>
+        <label class="field">
+            <span class="field-label">نوع وسیله نقلیه</span>
+            <select class="input" @bind="_type" @bind:after="ResetPage">
+                <option value="">همه‌ی انواع</option>
+                @foreach (var t in VehicleTypes.All)
+                {
+                    <option value="@t.Key">@t.Name</option>
+                }
+            </select>
+        </label>
+        <label class="field">
+            <span class="field-label">وضعیت اشتراک</span>
+            <select class="input" @bind="_vip" @bind:after="ResetPage">
+                <option value="all">VIP و عادی</option>
+                <option value="vip">فقط VIP</option>
+                <option value="regular">فقط عادی</option>
+            </select>
+        </label>
+        @if (HasFilter)
+        {
+            <button type="button" class="btn btn-ghost" @onclick="Clear">پاک‌کردن فیلترها</button>
+        }
+    </div>
+
+    <p class="result-count" aria-live="polite">@Fa.Number(_rows.Count) نتیجه@(HasFilter ? $" از {Fa.Number(_total)} وسیله‌ی حاضر" : "")</p>
+
+    @if (_rows.Count == 0)
+    {
+        @if (_total == 0)
+        {
+            <EmptyState IconName="car" Title="در حال حاضر وسیله‌ای در پارکینگ نیست" Text="با ثبت ورود، وسایل نقلیه در این فهرست نمایش داده می‌شوند.">
+                <a class="btn btn-primary" href="vehicles/entry"><Icon Name="login" Size="16" />ثبت ورود</a>
+            </EmptyState>
+        }
+        else
+        {
+            <EmptyState IconName="search" Title="نتیجه‌ای پیدا نشد" Text="عبارت جست‌وجو یا فیلترها را تغییر دهید.">
+                <button type="button" class="btn btn-ghost" @onclick="Clear">پاک‌کردن فیلترها</button>
+            </EmptyState>
+        }
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th class="col-n">ردیف</th>
+                        <SortHeader Label="پلاک" Key="plate" Current="@_sort" Descending="_desc" OnSort="Sort" />
+                        <SortHeader Label="نام مالک" Key="owner" Current="@_sort" Descending="_desc" OnSort="Sort" />
+                        <SortHeader Label="نوع وسیله نقلیه" Key="type" Current="@_sort" Descending="_desc" OnSort="Sort" />
+                        <SortHeader Label="زمان ورود" Key="entry" Current="@_sort" Descending="_desc" OnSort="Sort" />
+                        <th>مدت توقف</th>
+                        <SortHeader Label="وضعیت VIP" Key="vip" Current="@_sort" Descending="_desc" OnSort="Sort" />
+                        <th class="col-actions">عملیات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in Paged)
+                    {
+                        <tr>
+                            <td class="col-n">@Fa.Number(row.Number)</td>
+                            <td><PlateTag Plate="@row.Vehicle.LicensePlate" /></td>
+                            <td>@row.Vehicle.OwnerName</td>
+                            <td><TypeBadge Key="@row.Vehicle.VehicleTypeName" /></td>
+                            <td>@Fa.Stamp(row.Vehicle.EntryTime)</td>
+                            <td>@Fa.Duration(row.Duration)</td>
+                            <td><VipBadge IsVip="@row.Vehicle.IsVip" /></td>
+                            <td class="col-actions">
+                                <button type="button" class="btn btn-ghost btn-sm" @onclick="() => _detail = row.Vehicle"><Icon Name="eye" Size="15" />جزئیات</button>
+                                <button type="button" class="btn btn-danger-soft btn-sm" @onclick="() => Exit(row.Vehicle)"><Icon Name="logout" Size="15" />ثبت خروج</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <Pager Total="_rows.Count" Page="_page" PageSize="Settings.PageSize" PageChanged="p => _page = p" />
+    }
+</section>
+
+@if (_detail is not null)
+{
+    <Modal Title="جزئیات وسیله نقلیه" OnClose="() => _detail = null">
+        <ChildContent><VehicleDetails Vehicle="_detail" /></ChildContent>
+        <Footer>
+            <button type="button" class="btn btn-ghost" @onclick="() => _detail = null">بستن</button>
+            <button type="button" class="btn btn-danger-soft" @onclick="() => Exit(_detail)"><Icon Name="logout" Size="16" />ثبت خروج</button>
+        </Footer>
+    </Modal>
+}
+
+@code {
+    private IReadOnlyList<ParkedRow> _rows = Array.Empty<ParkedRow>();
+    private int _total;
+    private string _search = string.Empty;
+    private string _type = string.Empty;
+    private string _vip = "all";
+    private string _sort = "entry";
+    private bool _desc;
+    private int _page = 1;
+    private Vehicle? _detail;
+
+    private bool HasFilter => !string.IsNullOrWhiteSpace(_search) || _type != string.Empty || _vip != "all";
+
+    private IEnumerable<ParkedRow> Paged
+    {
+        get
+        {
+            int size = Settings.PageSize;
+            int pages = Math.Max(1, (int)Math.Ceiling(_rows.Count / (double)size));
+            int page = Math.Clamp(_page, 1, pages);
+            return _rows.Skip((page - 1) * size).Take(size);
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        Settings.Changed += OnSettings;
+        base.OnInitialized();
+    }
+
+    protected override void OnDataChanged()
+    {
+        _total = State.Snapshot().ParkedCount;
+        bool? vip = _vip switch { "vip" => true, "regular" => false, _ => null };
+        _rows = VehicleSvc.QueryParked(new ParkedQuery(_search, string.IsNullOrEmpty(_type) ? null : _type, vip, _sort, _desc));
+        int pages = Math.Max(1, (int)Math.Ceiling(_rows.Count / (double)Settings.PageSize));
+        if (_page > pages) _page = pages;
+        // اگر وسیله‌ی در حال نمایش جزئیات از پارکینگ خارج شده باشد، پنجره بسته می‌شود.
+        if (_detail is not null && State.Find(_detail.LicensePlate) is null) _detail = null;
+    }
+
+    private void OnSettings() => _ = InvokeAsync(StateHasChanged);
+
+    private void ResetPage() { _page = 1; OnDataChanged(); }
+
+    private void Clear()
+    {
+        _search = string.Empty; _type = string.Empty; _vip = "all"; _page = 1;
+        OnDataChanged();
+    }
+
+    private void Sort(string key)
+    {
+        if (_sort == key) _desc = !_desc;
+        else { _sort = key; _desc = false; }
+        OnDataChanged();
+    }
+
+    private void Exit(Vehicle v) => Nav.NavigateTo($"vehicles/exit?plate={Uri.EscapeDataString(v.LicensePlate)}");
+
+    public override void Dispose()
+    {
+        Settings.Changed -= OnSettings;
+        base.Dispose();
+    }
+}

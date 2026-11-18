@@ -1,0 +1,65 @@
+@inherits LiveComponentBase
+
+<aside class="sidebar no-print" aria-label="منوی اصلی">
+    <div class="brand">
+        <span class="brand-mark"><Icon Name="parking" Size="24" /></span>
+        <div class="brand-text">
+            <strong>SmartParking</strong>
+            <small>سامانه مدیریت هوشمند پارکینگ</small>
+        </div>
+    </div>
+
+    <nav class="nav" @onclick="Navigated">
+        <p class="nav-group">مدیریت اصلی</p>
+        <NavLink class="nav-link" href="dashboard" Match="NavLinkMatch.All"><Icon Name="dashboard" />داشبورد اصلی</NavLink>
+        <NavLink class="nav-link" href="vehicles" Match="NavLinkMatch.All">
+            <Icon Name="car" />وسایل نقلیه حاضر
+            <span class="nav-count">@Fa.Number(_parked)</span>
+        </NavLink>
+        <NavLink class="nav-link" href="vehicles/entry" Match="NavLinkMatch.All"><Icon Name="login" />ثبت ورود</NavLink>
+        <NavLink class="nav-link" href="vehicles/exit" Match="NavLinkMatch.All"><Icon Name="logout" />ثبت خروج</NavLink>
+        <NavLink class="nav-link" href="search" Match="NavLinkMatch.All"><Icon Name="search" />جست‌وجوی پلاک</NavLink>
+
+        <p class="nav-group">گزارش‌ها و تحلیل</p>
+        <NavLink class="nav-link" href="reports/financial" Match="NavLinkMatch.All"><Icon Name="wallet" />گزارش‌های مالی</NavLink>
+        <NavLink class="nav-link" href="analytics" Match="NavLinkMatch.All"><Icon Name="chart" />آمار و تحلیل</NavLink>
+        <NavLink class="nav-link" href="history" Match="NavLinkMatch.All"><Icon Name="history" />تاریخچه خروج‌ها</NavLink>
+        <NavLink class="nav-link" href="tariffs" Match="NavLinkMatch.All"><Icon Name="tag" />تعرفه‌ها</NavLink>
+
+        <p class="nav-group">سیستم</p>
+        <NavLink class="nav-link" href="settings" Match="NavLinkMatch.All"><Icon Name="settings" />تنظیمات</NavLink>
+        <NavLink class="nav-link" href="about" Match="NavLinkMatch.All"><Icon Name="info" />درباره سیستم</NavLink>
+    </nav>
+
+    <div class="side-capacity" title="وضعیت لحظه‌ای ظرفیت">
+        <div class="side-capacity-row">
+            <span>ظرفیت پارکینگ</span>
+            <strong>@Fa.Number(_parked) از @Fa.Number(_capacity)</strong>
+        </div>
+        <div class="meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@((int)_percent)">
+            <span class="meter-fill lv-@CapacityLevels.Css(_level)" style="width:@(_percent.ToString("0.#", CultureInfo.InvariantCulture))%"></span>
+        </div>
+        <small>@CapacityLevels.Label(_level)</small>
+    </div>
+</aside>
+
+@code {
+    [Parameter] public EventCallback OnNavigate { get; set; }
+
+    private int _parked, _capacity;
+    private double _percent;
+    private CapacityLevel _level;
+
+    protected override TimeSpan? RefreshInterval => null;
+
+    protected override void OnDataChanged()
+    {
+        ParkingSnapshot s = State.Snapshot();
+        _parked = s.ParkedCount;
+        _capacity = s.Capacity;
+        _percent = s.OccupancyPercent;
+        _level = CapacityLevels.Of(_percent, s.IsFull);
+    }
+
+    private Task Navigated() => OnNavigate.InvokeAsync();
+}

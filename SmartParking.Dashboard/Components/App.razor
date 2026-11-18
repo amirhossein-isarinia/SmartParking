@@ -1,0 +1,61 @@
+@using Microsoft.AspNetCore.Components.Endpoints
+<!DOCTYPE html>
+<html lang="fa" dir="rtl" data-theme="dark">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark light" />
+    <base href="/" />
+    <title>SmartParking | سامانه مدیریت هوشمند پارکینگ</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2310B981'/%3E%3Cpath d='M12 24V8h6.5a5 5 0 0 1 0 10H12' fill='none' stroke='%23101827' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+    <script>
+        (function () {
+            try {
+                var d = document.documentElement, g = function (k) { return localStorage.getItem('sp.' + k); };
+                var t = g('theme'); if (t === 'light' || t === 'dark') d.setAttribute('data-theme', t);
+                if (g('anim') === 'off') d.setAttribute('data-anim', 'off');
+                var s = g('density'); if (s === 'compact') d.setAttribute('data-density', s);
+            } catch (e) { }
+        })();
+    </script>
+    <link rel="preload" href="@Assets["fonts/Vazirmatn.woff2"]" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="@Assets["css/app.css"]" />
+    <HeadOutlet @rendermode="RenderModeForPage" />
+</head>
+
+<body>
+    <Routes @rendermode="RenderModeForPage" />
+
+    <div id="components-reconnect-modal" class="reconnect" aria-live="assertive">
+        <div class="reconnect-card">
+            <span class="reconnect-spinner" aria-hidden="true"></span>
+            <div class="reconnect-text">
+                <strong class="reconnect-when-show">ارتباط با برنامه قطع شد؛ در حال اتصال مجدد...</strong>
+                <strong class="reconnect-when-failed">اتصال برقرار نشد. اطمینان دهید برنامه در حال اجراست.</strong>
+                <strong class="reconnect-when-rejected">نشست شما منقضی شده است.</strong>
+                <button type="button" class="btn btn-primary btn-sm reconnect-when-failed reconnect-when-rejected" onclick="location.reload()">بارگذاری مجدد صفحه</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="blazor-error-ui" role="alert">
+        خطایی رخ داد. لطفاً صفحه را دوباره بارگذاری کنید.
+        <a href="" class="reload">بارگذاری مجدد</a>
+        <button type="button" class="dismiss" aria-label="بستن" onclick="this.parentElement.style.display='none'">✕</button>
+    </div>
+
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
+    <script src="@Assets["js/app.js"]"></script>
+</body>
+
+</html>
+
+@code {
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    // برای صفحات خطا (Static SSR) حالت تعاملی غیرفعال می‌شود؛ بقیه‌ی صفحات تعاملی (Server) هستند.
+    private IComponentRenderMode? RenderModeForPage =>
+        HttpContext.AcceptsInteractiveRouting() ? new InteractiveServerRenderMode(prerender: false) : null;
+}

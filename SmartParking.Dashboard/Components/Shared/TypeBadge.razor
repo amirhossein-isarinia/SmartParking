@@ -1,0 +1,6 @@
+@{ var info = VehicleTypes.Get(Key); }
+<span class="type-badge" style="--c:@info.Color"><Icon Name="@info.Icon" Size="16" /><span>@info.Name</span></span>
+
+@code {
+    [Parameter, EditorRequired] public string Key { get; set; } = string.Empty;
+}

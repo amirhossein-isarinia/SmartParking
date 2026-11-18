@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>SmartParking.Dashboard</RootNamespace>
+    <AssemblyName>SmartParking.Dashboard</AssemblyName>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- منطق اصلی (Vehicle، ParkingManager، ExitRecord و ...) مستقیماً از پروژه اصلی استفاده می‌شود. -->
+    <ProjectReference Include="..\SmartParking.csproj" />
+  </ItemGroup>
+
+</Project>

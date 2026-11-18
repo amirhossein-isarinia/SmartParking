@@ -1,0 +1,43 @@
+@page "/tariffs"
+@inject TariffCatalog Catalog
+
+<PageTitle>تعرفه‌ها | SmartParking</PageTitle>
+
+<PageHeader Title="تعرفه‌ها" Subtitle="تعرفه‌ی هر نوع وسیله نقلیه، مطابق منطق فعلی پروژه" />
+
+<Notice Kind="info">
+    این صفحه فقط نمایشی است. مقادیر از اجرای واقعی کلاس‌های وسایل نقلیه استخراج می‌شوند و در این نسخه از داخل داشبورد قابل ویرایش نیستند.
+</Notice>
+
+<div class="tariff-grid">
+    @foreach (var t in Catalog.All)
+    {
+        var info = VehicleTypes.Get(t.Key);
+        <article class="tariff-card" style="--c:@info.Color">
+            <header>
+                <span class="tariff-icon"><Icon Name="@info.Icon" Size="24" /></span>
+                <h2>@info.Name</h2>
+            </header>
+            <dl class="kv">
+                <div><dt>هزینه‌ی ساعت اول</dt><dd>@Fa.Money(t.FirstHour)</dd></div>
+                <div><dt>هر ساعت اضافه</dt><dd>@Fa.Money(t.AdditionalHour)</dd></div>
+            </dl>
+            <ul class="tariff-notes">
+                @foreach (var note in t.Notes)
+                {
+                    <li>@note</li>
+                }
+                <li>تخفیف VIP: @Fa.Percent((double)(Catalog.VipDiscountRate * 100))</li>
+            </ul>
+        </article>
+    }
+</div>
+
+<section class="panel">
+    <h2 class="panel-title">قواعد محاسبه</h2>
+    <ul class="plain-list">
+        <li>مدت توقف به ساعت گرد می‌شود (به بالا) و حداقل یک ساعت محاسبه می‌شود.</li>
+        <li>هزینه‌ی پایه برابر است با تعرفه‌ی ساعت اول به‌علاوه‌ی ساعت‌های بعدی ضرب در تعرفه‌ی ساعت اضافه.</li>
+        <li>تخفیف VIP روی هزینه‌ی توقف اعمال می‌شود؛ هزینه‌ی ثابت شارژ خودروی برقی جداگانه اضافه می‌شود.</li>
+    </ul>
+</section>

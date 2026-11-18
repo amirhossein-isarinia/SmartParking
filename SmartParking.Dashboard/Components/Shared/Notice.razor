@@ -1,0 +1,10 @@
+<div class="notice notice-@Kind" role="@(Kind == "err" ? "alert" : "status")">
+    <Icon Name="@(Kind switch { "ok" => "check", "err" => "alert", "warn" => "alert", _ => "info" })" Size="18" />
+    <div class="notice-body">@ChildContent</div>
+</div>
+
+@code {
+    /// <summary>ok | err | warn | info</summary>
+    [Parameter] public string Kind { get; set; } = "info";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

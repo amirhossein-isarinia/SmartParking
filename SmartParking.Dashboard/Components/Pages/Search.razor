@@ -1,0 +1,122 @@
+@page "/search"
+@inherits LiveComponentBase
+@inject VehicleService VehicleSvc
+@inject NavigationManager Nav
+
+<PageTitle>جست‌وجوی پلاک | SmartParking</PageTitle>
+
+<PageHeader Title="جست‌وجوی پلاک" Subtitle="وضعیت حضور و سوابق خروج یک پلاک را ببینید" />
+
+<section class="panel">
+    <form class="search-bar" @onsubmit="Run" novalidate>
+        <label class="field grow">
+            <span class="field-label">پلاک</span>
+            <span class="input-icon">
+                <Icon Name="search" Size="18" />
+                <input class="input plate-input" dir="ltr" list="all-plates" autocomplete="off" placeholder="پلاک یا بخشی از آن" @bind="_term" @bind:event="oninput" />
+            </span>
+        </label>
+        <datalist id="all-plates">
+            @foreach (var v in _plates)
+            {
+                <option value="@v"></option>
+            }
+        </datalist>
+        <button type="submit" class="btn btn-primary">جست‌وجو</button>
+    </form>
+
+    @if (!_searched)
+    {
+        <EmptyState IconName="search" Title="پلاک را وارد کنید" Text="نتیجه‌ی جست‌وجو شامل وضعیت حضور فعلی و سوابق خروج قبلی همان پلاک است." />
+    }
+    else if (_result.Exact is null && _result.Similar.Count == 0 && _result.History.Count == 0)
+    {
+        <EmptyState IconName="alert" Title="نتیجه‌ای پیدا نشد" Text="وسیله‌ای با این پلاک نه در پارکینگ حاضر است و نه سابقه‌ی خروجی دارد." />
+    }
+    else
+    {
+        @if (_result.Exact is Vehicle exact)
+        {
+            <h2 class="section-title">در پارکینگ حاضر است</h2>
+            <div class="vehicle-card">
+                <VehicleDetails Vehicle="exact" />
+                <div class="form-actions">
+                    <a class="btn btn-danger-soft" href="vehicles/exit?plate=@Uri.EscapeDataString(exact.LicensePlate)"><Icon Name="logout" Size="16" />ثبت خروج</a>
+                </div>
+            </div>
+        }
+        else
+        {
+            <Notice Kind="info">پلاک واردشده در حال حاضر در پارکینگ حضور ندارد.</Notice>
+        }
+
+        @if (_result.Similar.Count > 0)
+        {
+            <h2 class="section-title">پلاک‌های مشابه در پارکینگ</h2>
+            <div class="table-wrap">
+                <table class="table">
+                    <thead><tr><th>پلاک</th><th>نام مالک</th><th>نوع وسیله نقلیه</th><th>زمان ورود</th><th class="col-actions">عملیات</th></tr></thead>
+                    <tbody>
+                        @foreach (var v in _result.Similar)
+                        {
+                            <tr>
+                                <td><PlateTag Plate="@v.LicensePlate" /></td>
+                                <td>@v.OwnerName</td>
+                                <td><TypeBadge Key="@v.VehicleTypeName" /></td>
+                                <td>@Fa.Stamp(v.EntryTime)</td>
+                                <td class="col-actions"><button type="button" class="btn btn-ghost btn-sm" @onclick="() => Pick(v.LicensePlate)">مشاهده</button></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        @if (_result.History.Count > 0)
+        {
+            <h2 class="section-title">سوابق خروج</h2>
+            <div class="table-wrap">
+                <table class="table">
+                    <thead><tr><th>پلاک</th><th>نام مالک</th><th>زمان ورود</th><th>زمان خروج</th><th>مدت توقف</th><th class="num">مبلغ نهایی</th></tr></thead>
+                    <tbody>
+                        @foreach (var r in _result.History)
+                        {
+                            <tr>
+                                <td><PlateTag Plate="@r.Record.Vehicle.LicensePlate" /></td>
+                                <td>@r.Record.Vehicle.OwnerName</td>
+                                <td>@Fa.Stamp(r.Record.Vehicle.EntryTime)</td>
+                                <td>@Fa.Stamp(r.Record.ExitTime)</td>
+                                <td>@Fa.Duration(r.Record.Duration)</td>
+                                <td class="num">@Fa.Money(r.Record.Fee)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    }
+</section>
+
+@code {
+    private string _term = string.Empty;
+    private bool _searched;
+    private PlateSearchResult _result = new(null, Array.Empty<Vehicle>(), Array.Empty<ExitRow>());
+    private IReadOnlyList<string> _plates = Array.Empty<string>();
+
+    protected override void OnDataChanged()
+    {
+        var snap = State.Snapshot();
+        _plates = snap.Parked.Select(v => v.LicensePlate)
+                    .Concat(snap.Exits.Select(r => r.Vehicle.LicensePlate))
+                    .Distinct().OrderBy(p => p).ToList();
+        if (_searched) _result = VehicleSvc.SearchPlate(_term);
+    }
+
+    private void Run()
+    {
+        _searched = !string.IsNullOrWhiteSpace(_term);
+        _result = VehicleSvc.SearchPlate(_term);
+    }
+
+    private void Pick(string plate) { _term = plate; Run(); }
+}

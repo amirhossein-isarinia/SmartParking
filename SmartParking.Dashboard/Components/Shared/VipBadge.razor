@@ -1,0 +1,12 @@
+@if (IsVip)
+{
+    <span class="vip-badge"><Icon Name="crown" Size="13" />VIP</span>
+}
+else
+{
+    <span class="muted">عادی</span>
+}
+
+@code {
+    [Parameter] public bool IsVip { get; set; }
+}

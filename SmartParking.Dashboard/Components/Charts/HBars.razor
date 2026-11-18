@@ -1,0 +1,21 @@
+@* میله‌های افقی ساده برای مقایسه‌ی سهم هر نوع وسیله *@
+@{ decimal max = Items.Count == 0 ? 0 : Items.Max(i => i.Value); }
+<ul class="hbars">
+    @foreach (var item in Items)
+    {
+        double pct = max <= 0 ? 0 : (double)(item.Value / max * 100);
+        <li>
+            <div class="hbars-row">
+                <span class="hbars-name"><i style="background:@item.Color"></i>@item.Name</span>
+                <span class="hbars-value">@item.Text</span>
+            </div>
+            <div class="hbars-track"><span style="width:@pct.ToString("0.#", CultureInfo.InvariantCulture)%;background:@item.Color"></span></div>
+        </li>
+    }
+</ul>
+
+@code {
+    public sealed record Item(string Name, string Color, decimal Value, string Text);
+
+    [Parameter, EditorRequired] public IReadOnlyList<Item> Items { get; set; } = Array.Empty<Item>();
+}

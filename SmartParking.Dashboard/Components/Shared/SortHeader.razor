@@ -1,0 +1,18 @@
+<th scope="col" class="@Class" aria-sort="@AriaSort">
+    <button type="button" class="th-sort @(Active ? "is-active" : "")" @onclick="() => OnSort.InvokeAsync(Key)">
+        <span>@Label</span>
+        <Icon Name="@(Active ? (Descending ? "sort-desc" : "sort-asc") : "sort")" Size="14" />
+    </button>
+</th>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Key { get; set; } = string.Empty;
+    [Parameter] public string Current { get; set; } = string.Empty;
+    [Parameter] public bool Descending { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public EventCallback<string> OnSort { get; set; }
+
+    private bool Active => Current == Key;
+    private string AriaSort => !Active ? "none" : Descending ? "descending" : "ascending";
+}

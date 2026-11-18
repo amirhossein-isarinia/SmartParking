@@ -1,0 +1,73 @@
+@page "/settings"
+@implements IDisposable
+@inject UiSettings Ui
+@inject NavigationManager Nav
+
+<PageTitle>تنظیمات | SmartParking</PageTitle>
+
+<PageHeader Title="تنظیمات" Subtitle="تنظیمات ظاهری؛ روی اطلاعات و منطق پارکینگ هیچ اثری ندارند" />
+
+<div class="grid grid-even">
+    <section class="panel">
+        <h2 class="panel-title">ظاهر</h2>
+
+        <div class="setting-row">
+            <div><strong>تم رنگی</strong><small>تیره یا روشن</small></div>
+            <div class="segmented" role="group" aria-label="تم رنگی">
+                <button type="button" class="@(Ui.Theme == "dark" ? "is-active" : "")" @onclick='() => Ui.SetThemeAsync("dark")'><Icon Name="moon" Size="15" />تیره</button>
+                <button type="button" class="@(Ui.Theme == "light" ? "is-active" : "")" @onclick='() => Ui.SetThemeAsync("light")'><Icon Name="sun" Size="15" />روشن</button>
+            </div>
+        </div>
+
+        <div class="setting-row">
+            <div><strong>انیمیشن‌ها</strong><small>حرکت و انتقال‌های نرم رابط کاربری</small></div>
+            <label class="switch">
+                <input type="checkbox" checked="@Ui.Animations" @onchange="e => Ui.SetAnimationsAsync((bool)(e.Value ?? false))" />
+                <span class="switch-ui" aria-hidden="true"></span>
+                <span>@(Ui.Animations ? "روشن" : "خاموش")</span>
+            </label>
+        </div>
+
+        <div class="setting-row">
+            <div><strong>تراکم جدول‌ها</strong><small>فاصله‌ی ردیف‌ها</small></div>
+            <div class="segmented" role="group" aria-label="تراکم جدول">
+                <button type="button" class="@(Ui.Density == "comfortable" ? "is-active" : "")" @onclick='() => Ui.SetDensityAsync("comfortable")'>راحت</button>
+                <button type="button" class="@(Ui.Density == "compact" ? "is-active" : "")" @onclick='() => Ui.SetDensityAsync("compact")'>فشرده</button>
+            </div>
+        </div>
+
+        <div class="setting-row">
+            <div><strong>تعداد ردیف در هر صفحه</strong><small>برای جدول‌های دارای صفحه‌بندی</small></div>
+            <div class="segmented" role="group" aria-label="تعداد ردیف">
+                @foreach (int size in UiSettings.PageSizes)
+                {
+                    int s = size;
+                    <button type="button" class="@(Ui.PageSize == s ? "is-active" : "")" @onclick="() => Ui.SetPageSizeAsync(s)">@Fa.Number(s)</button>
+                }
+            </div>
+        </div>
+
+        <p class="panel-sub">این تنظیمات در مرورگر همین رایانه نگه‌داری می‌شوند.</p>
+    </section>
+
+    <section class="panel">
+        <h2 class="panel-title">اطلاعات برنامه</h2>
+        <dl class="kv">
+            <div><dt>نسخه‌ی داشبورد</dt><dd>@Fa.Digits(AppInfo.Version)</dd></div>
+            <div><dt>آدرس محلی اجرا</dt><dd><bdi>@Nav.BaseUri.TrimEnd('/')</bdi></dd></div>
+            <div><dt>ظرفیت پارکینگ</dt><dd>@Fa.Number(ParkingManager.Capacity) وسیله</dd></div>
+            <div><dt>نسخه‌ی .NET</dt><dd><bdi>@Environment.Version</bdi></dd></div>
+        </dl>
+        <Notice Kind="warn">
+            داده‌ها فقط در حافظه‌ی برنامه نگه‌داری می‌شوند و پس از توقف یا اجرای مجدد برنامه از بین می‌روند. در این نسخه ذخیره‌سازی دائمی وجود ندارد.
+        </Notice>
+    </section>
+</div>
+
+@code {
+    protected override void OnInitialized() => Ui.Changed += OnChanged;
+
+    private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Ui.Changed -= OnChanged;
+}

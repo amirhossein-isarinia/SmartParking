@@ -1,0 +1,42 @@
+@* نقشه‌ی اشغال ظرفیت: هر خانه یک ظرفیت از پارکینگ است؛ خانه‌های پر با رنگ وضعیت و آیکون نوع وسیله نمایش داده می‌شوند. *@
+@{ int cols = Math.Min(10, Math.Max(1, Capacity)); }
+<div class="bays-wrap">
+    <div class="bays lv-@CapacityLevels.Css(Level)" style="--cols:@cols" role="img" aria-label="نقشه‌ی اشغال ظرفیت: @Fa.Number(Vehicles.Count) از @Fa.Number(Capacity)">
+        @for (int i = 0; i < Capacity; i++)
+        {
+            int idx = i;
+            if (i < Vehicles.Count)
+            {
+                var v = Vehicles[i];
+                <span class="bay is-taken @(_hover == i ? "is-hover" : "")" @onmouseenter="() => _hover = idx" @onmouseleave="() => _hover = -1"
+                      title="@v.LicensePlate — @Fa.TypeName(v.VehicleTypeName)">
+                    <Icon Name="@VehicleTypes.Get(v.VehicleTypeName).Icon" Size="15" />
+                </span>
+            }
+            else
+            {
+                <span class="bay"></span>
+            }
+        }
+    </div>
+
+    <p class="bays-caption" aria-live="polite">
+        @if (_hover >= 0 && _hover < Vehicles.Count)
+        {
+            var v = Vehicles[_hover];
+            <span><bdi class="plate">@v.LicensePlate</bdi> · @Fa.TypeName(v.VehicleTypeName) · @v.OwnerName</span>
+        }
+        else
+        {
+            <span class="muted">نشانگر را روی خانه‌های پر ببرید تا مشخصات وسیله نمایش داده شود.</span>
+        }
+    </p>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<Vehicle> Vehicles { get; set; } = Array.Empty<Vehicle>();
+    [Parameter, EditorRequired] public int Capacity { get; set; }
+    [Parameter] public CapacityLevel Level { get; set; }
+
+    private int _hover = -1;
+}

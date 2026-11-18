@@ -1,0 +1,174 @@
+@page "/history"
+@inherits LiveComponentBase
+@inject FinancialService Fin
+@inject BrowserService Browser
+@inject ReceiptService Receipts
+@inject UiSettings Settings
+
+<PageTitle>تاریخچه خروج‌ها | SmartParking</PageTitle>
+
+<PageHeader Title="تاریخچه خروج‌ها" Subtitle="تمام خروج‌های ثبت‌شده در نشست جاری">
+    <Actions>
+        <button type="button" class="btn btn-ghost" @onclick="Export" disabled="@(_rows.Count == 0)"><Icon Name="download" Size="16" />خروجی CSV</button>
+        <button type="button" class="btn btn-primary" @onclick="PrintList" disabled="@(_rows.Count == 0)"><Icon Name="printer" Size="16" />چاپ فهرست</button>
+    </Actions>
+</PageHeader>
+
+<div class="print-only print-title">
+    <strong>SmartParking — تاریخچه خروج‌ها</strong>
+    <span>تاریخ صدور: @Fa.Stamp(DateTime.Now)</span>
+</div>
+
+<section class="panel">
+    <div class="toolbar no-print">
+        <label class="field grow">
+            <span class="field-label">جست‌وجوی پلاک</span>
+            <span class="input-icon">
+                <Icon Name="search" Size="18" />
+                <input class="input" type="search" placeholder="پلاک یا بخشی از آن" @bind="_search" @bind:event="oninput" @bind:after="Reload" />
+            </span>
+        </label>
+        <label class="field">
+            <span class="field-label">نوع وسیله نقلیه</span>
+            <select class="input" @bind="_type" @bind:after="Reload">
+                <option value="">همه‌ی انواع</option>
+                @foreach (var t in VehicleTypes.All)
+                {
+                    <option value="@t.Key">@t.Name</option>
+                }
+            </select>
+        </label>
+        <DateField Label="از تاریخ خروج" Value="_from" ValueChanged="d => { _from = d; Reload(); }" />
+        <DateField Label="تا تاریخ خروج" Value="_to" ValueChanged="d => { _to = d; Reload(); }" />
+        @if (Filtered)
+        {
+            <button type="button" class="btn btn-ghost" @onclick="Clear">پاک‌کردن فیلترها</button>
+        }
+    </div>
+
+    <p class="result-count" aria-live="polite">@Fa.Number(_rows.Count) رکورد@(Filtered ? $" از {Fa.Number(_allCount)}" : "") · مجموع @Fa.Money(_sum)</p>
+
+    @if (_rows.Count == 0)
+    {
+        <EmptyState IconName="history" Title="@(_allCount == 0 ? "هنوز خروجی ثبت نشده است" : "رکوردی پیدا نشد")"
+                    Text="@(_allCount == 0 ? "پس از ثبت خروج، سوابق در این جدول نمایش داده می‌شوند." : "فیلترها را تغییر دهید.")" />
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <SortHeader Label="پلاک" Key="plate" Current="@_sort" Descending="_desc" OnSort="Sort" />
+                        <SortHeader Label="مالک" Key="owner" Current="@_sort" Descending="_desc" OnSort="Sort" />
+                        <SortHeader Label="نوع وسیله نقلیه" Key="type" Current="@_sort" Descending="_desc" OnSort="Sort" />
+                        <SortHeader Label="زمان ورود" Key="entry" Current="@_sort" Descending="_desc" OnSort="Sort" />
+                        <SortHeader Label="زمان خروج" Key="exit" Current="@_sort" Descending="_desc" OnSort="Sort" />
+                        <SortHeader Label="مدت توقف" Key="duration" Current="@_sort" Descending="_desc" OnSort="Sort" />
+                        <SortHeader Label="مبلغ نهایی" Key="fee" Current="@_sort" Descending="_desc" OnSort="Sort" Class="num" />
+                        <th class="col-actions no-print">رسید</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var r in Visible)
+                    {
+                        <tr>
+                            <td><PlateTag Plate="@r.Record.Vehicle.LicensePlate" /></td>
+                            <td>@r.Record.Vehicle.OwnerName</td>
+                            <td><TypeBadge Key="@r.Record.Vehicle.VehicleTypeName" /></td>
+                            <td>@Fa.Stamp(r.Record.Vehicle.EntryTime)</td>
+                            <td>@Fa.Stamp(r.Record.ExitTime)</td>
+                            <td>@Fa.Duration(r.Record.Duration)</td>
+                            <td class="num">@Fa.Money(r.Record.Fee)</td>
+                            <td class="col-actions no-print">
+                                <button type="button" class="btn btn-ghost btn-sm" @onclick="() => Receipts.Show(r.Record, r.Number)"><Icon Name="receipt" Size="15" />مشاهده رسید</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        @if (!_showAll)
+        {
+            <Pager Total="_rows.Count" Page="_page" PageSize="Settings.PageSize" PageChanged="p => _page = p" />
+        }
+    }
+</section>
+
+@code {
+    private IReadOnlyList<ExitRow> _rows = Array.Empty<ExitRow>();
+    private decimal _sum;
+    private int _allCount;
+    private string _search = string.Empty, _type = string.Empty;
+    private DateTime? _from, _to;
+    private string _sort = "exit";
+    private bool _desc = true;
+    private int _page = 1;
+    private bool _showAll;
+
+    private bool Filtered => !string.IsNullOrWhiteSpace(_search) || _type != string.Empty || _from is not null || _to is not null;
+
+    private IEnumerable<ExitRow> Visible
+    {
+        get
+        {
+            if (_showAll) return _rows;
+            int pages = Math.Max(1, (int)Math.Ceiling(_rows.Count / (double)Settings.PageSize));
+            int page = Math.Clamp(_page, 1, pages);
+            return _rows.Skip((page - 1) * Settings.PageSize).Take(Settings.PageSize);
+        }
+    }
+
+    protected override TimeSpan? RefreshInterval => null;
+
+    protected override void OnInitialized()
+    {
+        Settings.Changed += OnSettings;
+        base.OnInitialized();
+    }
+
+    protected override void OnDataChanged()
+    {
+        _rows = Fin.Query(new ExitQuery(_search, string.IsNullOrEmpty(_type) ? null : _type, _from, _to, _sort, _desc));
+        _sum = _rows.Sum(r => r.Record.Fee);
+        _allCount = State.Snapshot().Exits.Count;
+        int pages = Math.Max(1, (int)Math.Ceiling(_rows.Count / (double)Settings.PageSize));
+        if (_page > pages) _page = pages;
+    }
+
+    private void OnSettings() => _ = InvokeAsync(StateHasChanged);
+
+    private void Reload() { _page = 1; OnDataChanged(); }
+
+    private void Clear()
+    {
+        _search = string.Empty; _type = string.Empty; _from = null; _to = null;
+        Reload();
+    }
+
+    private void Sort(string key)
+    {
+        if (_sort == key) _desc = !_desc;
+        else { _sort = key; _desc = key is "fee" or "exit" or "duration"; }
+        _page = 1;
+        OnDataChanged();
+    }
+
+    private Task Export()
+        => Browser.DownloadTextAsync($"smartparking-exit-history-{DateTime.Now:yyyyMMdd-HHmm}.csv", Fin.BuildCsv(_rows));
+
+    private async Task PrintList()
+    {
+        _showAll = true;
+        StateHasChanged();
+        await Task.Delay(300);
+        await Browser.PrintAsync();
+        _showAll = false;
+    }
+
+    public override void Dispose()
+    {
+        Settings.Changed -= OnSettings;
+        base.Dispose();
+    }
+}

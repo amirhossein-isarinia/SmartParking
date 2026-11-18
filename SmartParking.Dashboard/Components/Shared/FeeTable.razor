@@ -1,0 +1,41 @@
+@* جدول جزئیات هزینه؛ در پیش‌نمایش خروج و رسید استفاده می‌شود. *@
+<table class="fee-table">
+    <tbody>
+        <tr><th scope="row">ساعت‌های قابل محاسبه (گردشده به بالا)</th><td>@Fa.Number(Fee.BillableHours) ساعت</td></tr>
+        <tr><th scope="row">تعرفه‌ی ساعت اول</th><td>@Fa.Money(Fee.FirstHourFee)</td></tr>
+        <tr><th scope="row">تعرفه‌ی هر ساعت اضافه</th><td>@Fa.Money(Fee.AdditionalHourFee)</td></tr>
+        <tr class="fee-sub"><th scope="row">هزینه‌ی پایه</th><td>@Fa.Money(Fee.BaseFee)</td></tr>
+
+        @if (Fee.TypeAdjustment != 0)
+        {
+            <tr class="@(Fee.TypeAdjustment < 0 ? "fee-minus" : "fee-plus")">
+                <th scope="row">@(Fee.TypeAdjustmentLabel ?? (Fee.TypeAdjustment < 0 ? "تخفیف اختصاصی نوع وسیله" : "هزینه‌ی اضافه‌ی اختصاصی نوع وسیله"))</th>
+                <td>@Signed(Fee.TypeAdjustment)</td>
+            </tr>
+        }
+        @if (Fee.IsVip)
+        {
+            <tr class="fee-minus">
+                <th scope="row">تخفیف VIP (@Fa.Percent((double)(Vehicle.VipDiscountRate * 100)))</th>
+                <td>@Signed(Fee.VipAdjustment)</td>
+            </tr>
+        }
+        @if (Fee.UsedCharger)
+        {
+            <tr class="fee-plus">
+                <th scope="row">هزینه‌ی شارژ خودروی برقی</th>
+                <td>@Signed(Fee.ChargerFee)</td>
+            </tr>
+        }
+    </tbody>
+    <tfoot>
+        <tr><th scope="row">مبلغ نهایی</th><td>@Fa.Money(Fee.Total)</td></tr>
+    </tfoot>
+</table>
+
+@code {
+    [Parameter, EditorRequired] public FeeBreakdown Fee { get; set; } = default!;
+
+    private static string Signed(decimal value)
+        => value < 0 ? "− " + Fa.Money(-value) : "+ " + Fa.Money(value);
+}

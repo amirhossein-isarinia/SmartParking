@@ -1,0 +1,91 @@
+@page "/analytics"
+@inherits LiveComponentBase
+@inject AnalyticsService AnalyticsSvc
+
+<PageTitle>آمار و تحلیل | SmartParking</PageTitle>
+
+<PageHeader Title="آمار و تحلیل" Subtitle="شاخص‌ها فقط از داده‌ی واقعی ثبت‌شده محاسبه می‌شوند؛ بدون برآورد یا عدد فرضی" />
+
+<section class="stat-strip stat-strip-4" aria-label="شاخص‌های اصلی">
+    <StatCell IconName="login" Tone="blue" Label="تعداد کل ورودها" Value="@Fa.Number(_d.TotalEntries)" Sub="حاضر + خارج‌شده" />
+    <StatCell IconName="logout" Tone="muted" Label="تعداد کل خروج‌ها" Value="@Fa.Number(_d.TotalExits)" Sub="در نشست جاری" />
+    <StatCell IconName="car" Tone="green" Label="خودروهای حاضر" Value="@Fa.Number(_d.Parked)" Sub="@($"از ظرفیت {Fa.Number(ParkingManager.Capacity)}")" />
+    <StatCell IconName="gauge" Tone="warn" Label="درصد اشغال" Value="@Fa.Percent(_d.Occupancy)" Sub="@CapacityLevels.Label(CapacityLevels.Of(_d.Occupancy, _d.Parked >= ParkingManager.Capacity))" />
+    <StatCell IconName="clock" Tone="blue" Label="متوسط مدت توقف"
+              Value="@(_d.AverageStay is TimeSpan s ? Fa.Duration(s) : "—")"
+              Sub="@(_d.AverageStay is null ? "هنوز خروجی ثبت نشده است" : "بر اساس خروج‌های ثبت‌شده")" />
+    <StatCell IconName="crown" Tone="warn" Label="مشتریان VIP" Value="@Fa.Number(_d.VipVehicles)" Sub="پلاک یکتا، حاضر و خارج‌شده" />
+    <StatCell IconName="wallet" Tone="green" Label="درآمد کل" Value="@Fa.Number(_d.TotalRevenue)" Sub="تومان" />
+    <StatCell IconName="trend" Tone="green" Label="متوسط درآمد هر خروج"
+              Value="@(_d.AverageRevenue is decimal avg ? Fa.Number(avg) : "—")"
+              Sub="@(_d.AverageRevenue is null ? "هنوز خروجی ثبت نشده است" : "تومان")" />
+</section>
+
+@if (_d.TotalEntries == 0)
+{
+    <section class="panel">
+        <EmptyState IconName="chart" Title="هنوز داده‌ای برای تحلیل وجود ندارد" Text="پس از ثبت ورود و خروج، نمودارها و جدول‌ها اینجا نمایش داده می‌شوند.">
+            <a class="btn btn-primary" href="vehicles/entry"><Icon Name="login" Size="16" />ثبت ورود</a>
+        </EmptyState>
+    </section>
+}
+else
+{
+    <div class="grid grid-even">
+        <section class="panel">
+            <div class="panel-head"><div><h2>سهم هر نوع وسیله نقلیه</h2><p class="panel-sub">بر اساس کل ورودها</p></div></div>
+            <DonutChart Slices="_share" CenterLabel="ورود ثبت‌شده" />
+        </section>
+
+        <section class="panel">
+            <div class="panel-head"><div><h2>درآمد به تفکیک نوع وسیله</h2><p class="panel-sub">از سوابق خروج</p></div></div>
+            @if (_d.TotalExits == 0)
+            {
+                <EmptyState IconName="wallet" Title="هنوز درآمدی ثبت نشده است" Text="پس از ثبت خروج، درآمد هر نوع وسیله اینجا نمایش داده می‌شود." />
+            }
+            else
+            {
+                <HBars Items="_revenue" />
+            }
+        </section>
+    </div>
+
+    <section class="panel">
+        <div class="panel-head"><div><h2>ساعت‌های ورود</h2><p class="panel-sub">تعداد ورودها بر اساس ساعت شبانه‌روز</p></div></div>
+        <BarChart Points="_d.EntriesByHour" Height="220" Label="ورودها بر اساس ساعت" Formatter="v => Fa.Number(v)" EmptyText="هنوز ورودی ثبت نشده است." />
+    </section>
+
+    <section class="panel">
+        <div class="panel-head"><div><h2>جدول مقایسه‌ی انواع وسیله نقلیه</h2></div></div>
+        <div class="table-wrap">
+            <table class="table">
+                <thead><tr><th>نوع وسیله نقلیه</th><th>ورودها</th><th>خروج‌ها</th><th>متوسط توقف</th><th class="num">درآمد</th></tr></thead>
+                <tbody>
+                    @foreach (var t in _d.ByType)
+                    {
+                        <tr>
+                            <td><TypeBadge Key="@t.Key" /></td>
+                            <td>@Fa.Number(t.Entries)</td>
+                            <td>@Fa.Number(t.Exits)</td>
+                            <td>@(t.AverageStay is TimeSpan st ? Fa.Duration(st) : "—")</td>
+                            <td class="num">@(t.Exits == 0 ? "—" : Fa.Money(t.Revenue))</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+}
+
+@code {
+    private AnalyticsData _d = new(0, 0, 0, 0, null, 0, 0, null, Array.Empty<TypeStat>(), Array.Empty<ChartPoint>());
+    private IReadOnlyList<TypeSlice> _share = Array.Empty<TypeSlice>();
+    private IReadOnlyList<HBars.Item> _revenue = Array.Empty<HBars.Item>();
+
+    protected override void OnDataChanged()
+    {
+        _d = AnalyticsSvc.Get();
+        _share = _d.ByType.Select(t => new TypeSlice(t.Key, t.Name, t.Entries, t.Color)).ToList();
+        _revenue = _d.ByType.Select(t => new HBars.Item(t.Name, t.Color, t.Revenue, t.Exits == 0 ? "—" : $"{Fa.Money(t.Revenue)} · {Fa.Number(t.Exits)} خروج")).ToList();
+    }
+}

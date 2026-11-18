@@ -1,0 +1,61 @@
+@inject FeeBreakdownService Fees
+
+@if (_fee is not null)
+{
+    Vehicle v = Record.Vehicle;
+    <article class="receipt" aria-label="رسید خروج">
+        <header class="receipt-head">
+            <div class="receipt-brand">
+                <span class="brand-mark"><Icon Name="parking" Size="22" /></span>
+                <div>
+                    <strong>SmartParking</strong>
+                    <small>سامانه مدیریت هوشمند پارکینگ</small>
+                </div>
+            </div>
+            <div class="receipt-title">
+                <h3>رسید خروج</h3>
+                <small>شماره‌ی ثبت: @Fa.Number(Number)</small>
+            </div>
+        </header>
+
+        <dl class="kv receipt-kv">
+            <div><dt>پلاک</dt><dd><PlateTag Plate="@v.LicensePlate" /></dd></div>
+            <div><dt>نام مالک</dt><dd>@v.OwnerName</dd></div>
+            <div><dt>نوع وسیله نقلیه</dt><dd>@Fa.TypeName(v.VehicleTypeName)@(v.IsVip ? " (VIP)" : "")</dd></div>
+            <div><dt>زمان ورود</dt><dd>@Fa.Stamp(v.EntryTime)</dd></div>
+            <div><dt>زمان خروج</dt><dd>@Fa.Stamp(Record.ExitTime)</dd></div>
+            <div><dt>مدت توقف</dt><dd>@Fa.Duration(Record.Duration)</dd></div>
+        </dl>
+
+        <FeeTable Fee="_fee" />
+
+        <footer class="receipt-foot">
+            <span>تاریخ صدور رسید: @Fa.Stamp(_issuedAt)</span>
+            <p>این رسید فقط گزارش محاسبه‌ی هزینه‌ی توقف است و به منزله‌ی تأیید دریافت یا پرداخت وجه نیست.</p>
+        </footer>
+    </article>
+}
+else
+{
+    <Notice Kind="err">جزئیات رسید در دسترس نیست.</Notice>
+}
+
+@code {
+    [Parameter, EditorRequired] public ExitRecord Record { get; set; } = default!;
+    [Parameter] public int Number { get; set; }
+
+    private FeeBreakdown? _fee;
+    private DateTime _issuedAt = DateTime.Now;
+
+    protected override void OnParametersSet()
+    {
+        _issuedAt = DateTime.Now;
+        try
+        {
+            FeeBreakdown f = Fees.Calculate(Record.Vehicle, Record.ExitTime);
+            // مبلغ ثبت‌شده در رکورد خروج، مرجع نهایی است.
+            _fee = f with { Total = Record.Fee };
+        }
+        catch (ArgumentException) { _fee = null; }
+    }
+}

@@ -1,0 +1,22 @@
+<div class="stat">
+    <span class="stat-icon tone-@Tone"><Icon Name="@IconName" Size="20" /></span>
+    <div class="stat-body">
+        <span class="stat-label">@Label</span>
+        <strong class="stat-value">@Value</strong>
+        @if (!string.IsNullOrEmpty(Sub))
+        {
+            <span class="stat-sub">@Sub</span>
+        }
+        @ChildContent
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string IconName { get; set; } = "info";
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Value { get; set; } = string.Empty;
+    [Parameter] public string? Sub { get; set; }
+    /// <summary>green | blue | warn | danger | muted</summary>
+    [Parameter] public string Tone { get; set; } = "green";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

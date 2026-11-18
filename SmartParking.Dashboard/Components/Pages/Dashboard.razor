@@ -1,0 +1,176 @@
+@page "/dashboard"
+@inherits LiveComponentBase
+@inject DashboardService Dash
+
+<PageTitle>داشبورد اصلی | SmartParking</PageTitle>
+
+<PageHeader Title="داشبورد اصلی" Subtitle="وضعیت لحظه‌ای پارکینگ، درآمد و فعالیت‌های اخیر" />
+
+<section class="stat-strip" aria-label="شاخص‌های کلیدی">
+    <StatCell IconName="car" Tone="blue" Label="خودروهای حاضر"
+              Value="@($"{Fa.Number(_s.Parked)} از {Fa.Number(_s.Capacity)}")"
+              Sub="@($"{Fa.Number(_s.Free)} جای خالی · {Fa.Percent(_s.Occupancy)} اشغال")" />
+    <StatCell IconName="wallet" Tone="green" Label="درآمد کل" Value="@Fa.Number(_s.Revenue)" Sub="تومان · از مجموع خروج‌های ثبت‌شده" />
+    <StatCell IconName="login" Tone="blue" Label="ورودهای فعال" Value="@Fa.Number(_s.Parked)" Sub="وسیله‌ی نقلیه‌ی حاضر" />
+    <StatCell IconName="logout" Tone="muted" Label="خروج‌های ثبت‌شده" Value="@Fa.Number(_s.Exits)" Sub="در نشست جاری" />
+    <StatCell IconName="gauge" Tone="@CapacityLevels.Css(_s.Level)" Label="درصد اشغال" Value="@Fa.Percent(_s.Occupancy)">
+        <span class="meter meter-sm"><span class="meter-fill lv-@CapacityLevels.Css(_s.Level)" style="width:@(_s.Occupancy.ToString("0.#", CultureInfo.InvariantCulture))%"></span></span>
+    </StatCell>
+</section>
+
+<div class="grid grid-main">
+    <section class="panel" aria-labelledby="rev-title">
+        <div class="panel-head">
+            <div>
+                <h2 id="rev-title">نمودار درآمد</h2>
+                <p class="panel-sub">بر اساس سوابق واقعی خروج</p>
+            </div>
+            <div class="segmented" role="group" aria-label="بازه‌ی نمودار">
+                <button type="button" class="@Seg(RevenueRange.Today)" @onclick="() => SetRange(RevenueRange.Today)">امروز</button>
+                <button type="button" class="@Seg(RevenueRange.Week)" @onclick="() => SetRange(RevenueRange.Week)">۷ روز اخیر</button>
+                <button type="button" class="@Seg(RevenueRange.Month)" @onclick="() => SetRange(RevenueRange.Month)">۳۰ روز اخیر</button>
+                <button type="button" class="@Seg(RevenueRange.Custom)" @onclick="() => SetRange(RevenueRange.Custom)">تاریخ دلخواه</button>
+            </div>
+        </div>
+
+        @if (_range == RevenueRange.Custom)
+        {
+            <div class="filter-row">
+                <DateField Label="از تاریخ" Value="_from" ValueChanged="OnFrom" />
+                <DateField Label="تا تاریخ" Value="_to" ValueChanged="OnTo" />
+            </div>
+        }
+
+        @if (_series.Error is not null)
+        {
+            <Notice Kind="warn">@_series.Error</Notice>
+        }
+        else
+        {
+            <p class="range-total">مجموع بازه: <strong>@Fa.Money(_series.Total)</strong> <span class="muted">· @Fa.Number(_series.ExitCount) خروج</span></p>
+            <BarChart Points="_series.Points" Label="نمودار درآمد" EmptyText="در این بازه هنوز درآمدی ثبت نشده است." />
+        }
+    </section>
+
+    <section class="panel" aria-labelledby="mix-title">
+        <div class="panel-head">
+            <div>
+                <h2 id="mix-title">ترکیب وسایل نقلیه</h2>
+                <p class="panel-sub">سهم هر نوع</p>
+            </div>
+            <div class="segmented" role="group" aria-label="نوع داده">
+                <button type="button" class="@(_mixParked ? "is-active" : "")" @onclick="() => SetMix(true)">حاضر</button>
+                <button type="button" class="@(!_mixParked ? "is-active" : "")" @onclick="() => SetMix(false)">خارج‌شده</button>
+            </div>
+        </div>
+        <DonutChart Slices="_mix" CenterLabel="@(_mixParked ? "وسیله‌ی حاضر" : "وسیله‌ی خارج‌شده")" />
+    </section>
+</div>
+
+<div class="grid grid-side">
+    <section class="panel" aria-labelledby="cap-title">
+        <div class="panel-head">
+            <div>
+                <h2 id="cap-title">وضعیت ظرفیت</h2>
+                <p class="panel-sub">ظرفیت ثابت پروژه: @Fa.Number(_s.Capacity) وسیله</p>
+            </div>
+            <span class="level-pill lv-@CapacityLevels.Css(_s.Level)">@CapacityLevels.Label(_s.Level)</span>
+        </div>
+
+        <div class="cap-figures">
+            <div><span>ظرفیت کل</span><strong>@Fa.Number(_s.Capacity)</strong></div>
+            <div><span>اشغال‌شده</span><strong>@Fa.Number(_s.Parked)</strong></div>
+            <div><span>خالی</span><strong>@Fa.Number(_s.Free)</strong></div>
+            <div><span>درصد اشغال</span><strong>@Fa.Percent(_s.Occupancy)</strong></div>
+        </div>
+
+        <CapacityBays Vehicles="_bays" Capacity="_s.Capacity" Level="_s.Level" />
+
+        <ul class="level-legend">
+            <li><i class="lv-ok"></i>عادی (کمتر از @Fa.Percent(CapacityLevels.WarningPercent))</li>
+            <li><i class="lv-warn"></i>نزدیک به تکمیل (از @Fa.Percent(CapacityLevels.WarningPercent))</li>
+            <li><i class="lv-danger"></i>تقریباً پر (از @Fa.Percent(CapacityLevels.CriticalPercent))</li>
+        </ul>
+    </section>
+
+    <section class="quick" aria-label="دسترسی سریع">
+        <a class="action-card action-in" href="vehicles/entry">
+            <span class="action-icon"><Icon Name="login" Size="30" /></span>
+            <strong>ثبت ورود وسیله نقلیه</strong>
+            <small>@(_s.IsFull ? "ظرفیت تکمیل است" : $"{Fa.Number(_s.Free)} جای خالی")</small>
+        </a>
+        <a class="action-card action-out" href="vehicles/exit">
+            <span class="action-icon"><Icon Name="logout" Size="30" /></span>
+            <strong>ثبت خروج وسیله نقلیه</strong>
+            <small>@(_s.Parked == 0 ? "وسیله‌ای حاضر نیست" : $"{Fa.Number(_s.Parked)} وسیله‌ی حاضر")</small>
+        </a>
+    </section>
+</div>
+
+<section class="panel" aria-labelledby="act-title">
+    <div class="panel-head">
+        <div>
+            <h2 id="act-title">آخرین فعالیت‌ها</h2>
+            <p class="panel-sub">ورودها و خروج‌های واقعی ثبت‌شده، تازه‌ترین در بالا</p>
+        </div>
+    </div>
+
+    @if (_acts.Count == 0)
+    {
+        <EmptyState IconName="history" Title="هنوز فعالیتی ثبت نشده است" Text="با ثبت اولین ورود، فعالیت‌ها اینجا نمایش داده می‌شوند.">
+            <a class="btn btn-primary" href="vehicles/entry"><Icon Name="login" Size="16" />ثبت ورود</a>
+        </EmptyState>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr><th>پلاک</th><th>نوع وسیله نقلیه</th><th>نام مالک</th><th>عملیات</th><th>تاریخ و ساعت</th><th class="num">مبلغ</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var a in _acts)
+                    {
+                        <tr>
+                            <td><PlateTag Plate="@a.Vehicle.LicensePlate" /></td>
+                            <td><TypeBadge Key="@a.Vehicle.VehicleTypeName" /></td>
+                            <td>@a.Vehicle.OwnerName</td>
+                            <td><span class="op-badge @(a.IsEntry ? "op-in" : "op-out")">@(a.IsEntry ? "ورود" : "خروج")</span></td>
+                            <td>@Fa.Stamp(a.Time)</td>
+                            <td class="num">@(a.Fee is decimal fee ? Fa.Money(fee) : "—")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@code {
+    private DashboardSummary _s = new(0, 0, 0, 0, 0, 0, CapacityLevel.Normal, false);
+    private RevenueSeries _series = new(Array.Empty<ChartPoint>(), 0, 0, null);
+    private IReadOnlyList<TypeSlice> _mix = Array.Empty<TypeSlice>();
+    private IReadOnlyList<ActivityItem> _acts = Array.Empty<ActivityItem>();
+    private IReadOnlyList<Vehicle> _bays = Array.Empty<Vehicle>();
+
+    private RevenueRange _range = RevenueRange.Week;
+    private DateTime? _from = DateTime.Today.AddDays(-6);
+    private DateTime? _to = DateTime.Today;
+    private bool _mixParked = true;
+
+    protected override void OnDataChanged()
+    {
+        _s = Dash.GetSummary();
+        _series = Dash.GetRevenueSeries(_range, _from, _to);
+        _mix = Dash.GetTypeMix(_mixParked);
+        _acts = Dash.GetRecentActivities(10);
+        _bays = State.Snapshot().Parked;
+    }
+
+    private string Seg(RevenueRange r) => _range == r ? "is-active" : string.Empty;
+
+    private void SetRange(RevenueRange r) { _range = r; OnDataChanged(); }
+    private void SetMix(bool parked) { _mixParked = parked; OnDataChanged(); }
+    private void OnFrom(DateTime? d) { _from = d; OnDataChanged(); }
+    private void OnTo(DateTime? d) { _to = d; OnDataChanged(); }
+}

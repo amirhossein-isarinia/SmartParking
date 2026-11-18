@@ -1,0 +1,40 @@
+@inject FeeBreakdownService Fees
+
+<div class="details">
+    <div class="details-head">
+        <PlateTag Plate="@Vehicle.LicensePlate" />
+        <TypeBadge Key="@Vehicle.VehicleTypeName" />
+        <VipBadge IsVip="@Vehicle.IsVip" />
+    </div>
+
+    <dl class="kv">
+        <div><dt>نام مالک</dt><dd>@Vehicle.OwnerName</dd></div>
+        <div><dt>زمان ورود</dt><dd>@Fa.Stamp(Vehicle.EntryTime)</dd></div>
+        <div><dt>مدت توقف تاکنون</dt><dd>@Fa.Duration(DateTime.Now - Vehicle.EntryTime)</dd></div>
+        @foreach (var (label, value) in VehicleFactory.Describe(Vehicle))
+        {
+            <div><dt>@label</dt><dd>@value</dd></div>
+        }
+    </dl>
+
+    @if (_estimate is not null)
+    {
+        <div class="details-fee">
+            <span>هزینه‌ی توقف تا همین لحظه</span>
+            <strong>@Fa.Money(_estimate.Total)</strong>
+            <small>بر اساس زمان فعلی و تعرفه‌ی همین نوع وسیله؛ مبلغ نهایی هنگام ثبت خروج محاسبه می‌شود.</small>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Vehicle Vehicle { get; set; } = default!;
+
+    private FeeBreakdown? _estimate;
+
+    protected override void OnParametersSet()
+    {
+        try { _estimate = Fees.Calculate(Vehicle, DateTime.Now); }
+        catch (ArgumentException) { _estimate = null; }
+    }
+}

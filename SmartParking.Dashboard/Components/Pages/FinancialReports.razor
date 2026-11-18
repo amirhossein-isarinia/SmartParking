@@ -1,0 +1,209 @@
+@page "/reports/financial"
+@inherits LiveComponentBase
+@inject FinancialService Fin
+@inject BrowserService Browser
+@inject UiSettings Settings
+
+<PageTitle>گزارش‌های مالی | SmartParking</PageTitle>
+
+<PageHeader Title="گزارش‌های مالی" Subtitle="درآمد فقط بر اساس سوابق واقعی خروج محاسبه می‌شود">
+    <Actions>
+        <button type="button" class="btn btn-ghost" @onclick="Export" disabled="@(_rows.Count == 0)"><Icon Name="download" Size="16" />خروجی CSV</button>
+        <button type="button" class="btn btn-primary" @onclick="PrintReport"><Icon Name="printer" Size="16" />چاپ گزارش</button>
+    </Actions>
+</PageHeader>
+
+<div class="print-only print-title">
+    <strong>SmartParking — گزارش مالی</strong>
+    <span>تاریخ صدور: @Fa.Stamp(DateTime.Now)</span>
+    <span>@FilterSummary</span>
+</div>
+
+<section class="panel no-print" aria-label="فیلترها">
+    <div class="toolbar">
+        <DateField Label="از تاریخ" Value="_from" ValueChanged="d => { _from = d; Reload(); }" />
+        <DateField Label="تا تاریخ" Value="_to" ValueChanged="d => { _to = d; Reload(); }" />
+        <label class="field">
+            <span class="field-label">نوع وسیله نقلیه</span>
+            <select class="input" @bind="_type" @bind:after="Reload">
+                <option value="">همه‌ی انواع</option>
+                @foreach (var t in VehicleTypes.All)
+                {
+                    <option value="@t.Key">@t.Name</option>
+                }
+            </select>
+        </label>
+        <div class="field">
+            <span class="field-label">بازه‌ی سریع</span>
+            <div class="segmented">
+                <button type="button" @onclick="() => Preset(0)">امروز</button>
+                <button type="button" @onclick="() => Preset(6)">۷ روز</button>
+                <button type="button" @onclick="() => Preset(29)">۳۰ روز</button>
+                <button type="button" @onclick="() => Preset(-1)">همه</button>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="stat-strip stat-strip-4" aria-label="شاخص‌های مالی">
+    <StatCell IconName="wallet" Tone="green" Label="درآمد کل" Value="@Fa.Number(_totalAll)" Sub="تومان · همه‌ی سوابق" />
+    <StatCell IconName="trend" Tone="blue" Label="درآمد امروز" Value="@Fa.Number(_today)" Sub="تومان · بر اساس تاریخ خروج" />
+    <StatCell IconName="logout" Tone="muted" Label="تعداد خروج‌ها" Value="@Fa.Number(_totals.Count)" Sub="@(Filtered ? "در نتایج فیلترشده" : "کل سوابق")" />
+    <StatCell IconName="gauge" Tone="warn" Label="متوسط مبلغ هر خروج" Value="@(_totals.Count == 0 ? "—" : Fa.Number(_totals.Average))" Sub="@(_totals.Count == 0 ? "داده‌ای وجود ندارد" : "تومان")" />
+</section>
+
+<div class="total-bar">
+    <span>مجموع درآمد @(Filtered ? "نتایج فیلترشده" : "همه‌ی سوابق")</span>
+    <strong>@Fa.Money(_totals.Revenue)</strong>
+</div>
+
+@if (_rows.Count == 0)
+{
+    <section class="panel">
+        <EmptyState IconName="wallet" Title="@(_allCount == 0 ? "هنوز خروجی ثبت نشده است" : "در این فیلتر رکوردی وجود ندارد")"
+                    Text="@(_allCount == 0 ? "پس از ثبت اولین خروج، گزارش‌های مالی اینجا نمایش داده می‌شوند." : "بازه‌ی تاریخ یا نوع وسیله را تغییر دهید.")" />
+    </section>
+}
+else
+{
+    <div class="grid grid-even">
+        <section class="panel">
+            <div class="panel-head"><div><h2>درآمد به تفکیک نوع وسیله</h2><p class="panel-sub">@(Filtered ? "نتایج فیلترشده" : "همه‌ی سوابق")</p></div></div>
+            <HBars Items="_byType" />
+        </section>
+
+        <section class="panel">
+            <div class="panel-head"><div><h2>گزارش روزانه</h2><p class="panel-sub">بر اساس تاریخ خروج</p></div></div>
+            <div class="table-wrap table-scroll">
+                <table class="table">
+                    <thead><tr><th>تاریخ</th><th>تعداد خروج</th><th class="num">درآمد</th></tr></thead>
+                    <tbody>
+                        @foreach (var d in _daily)
+                        {
+                            <tr><td>@Fa.LongDate(d.Date)</td><td>@Fa.Number(d.Count)</td><td class="num">@Fa.Money(d.Revenue)</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <section class="panel">
+        <div class="panel-head"><div><h2>فهرست سوابق مالی</h2><p class="panel-sub">@Fa.Number(_rows.Count) رکورد</p></div></div>
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th class="col-n">شماره</th>
+                        <SortHeader Label="پلاک" Key="plate" Current="@_sort" Descending="_desc" OnSort="Sort" />
+                        <SortHeader Label="نوع وسیله نقلیه" Key="type" Current="@_sort" Descending="_desc" OnSort="Sort" />
+                        <SortHeader Label="زمان خروج" Key="exit" Current="@_sort" Descending="_desc" OnSort="Sort" />
+                        <SortHeader Label="مدت توقف" Key="duration" Current="@_sort" Descending="_desc" OnSort="Sort" />
+                        <SortHeader Label="مبلغ نهایی" Key="fee" Current="@_sort" Descending="_desc" OnSort="Sort" Class="num" />
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var r in Visible)
+                    {
+                        <tr>
+                            <td class="col-n">@Fa.Number(r.Number)</td>
+                            <td><PlateTag Plate="@r.Record.Vehicle.LicensePlate" /></td>
+                            <td><TypeBadge Key="@r.Record.Vehicle.VehicleTypeName" /></td>
+                            <td>@Fa.Stamp(r.Record.ExitTime)</td>
+                            <td>@Fa.Duration(r.Record.Duration)</td>
+                            <td class="num">@Fa.Money(r.Record.Fee)</td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot><tr><th colspan="5" scope="row">مجموع</th><td class="num">@Fa.Money(_totals.Revenue)</td></tr></tfoot>
+            </table>
+        </div>
+        @if (!_showAll)
+        {
+            <Pager Total="_rows.Count" Page="_page" PageSize="Settings.PageSize" PageChanged="p => _page = p" />
+        }
+    </section>
+}
+
+@code {
+    private IReadOnlyList<ExitRow> _rows = Array.Empty<ExitRow>();
+    private IReadOnlyList<HBars.Item> _byType = Array.Empty<HBars.Item>();
+    private IReadOnlyList<DailyRevenue> _daily = Array.Empty<DailyRevenue>();
+    private ExitTotals _totals = new(0, 0, 0);
+    private decimal _totalAll, _today;
+    private int _allCount;
+
+    private DateTime? _from, _to;
+    private string _type = string.Empty;
+    private string _sort = "exit";
+    private bool _desc = true;
+    private int _page = 1;
+    private bool _showAll;
+
+    private bool Filtered => _from is not null || _to is not null || _type != string.Empty;
+
+    private IEnumerable<ExitRow> Visible => _showAll ? _rows : _rows.Skip((Math.Clamp(_page, 1, Math.Max(1, (int)Math.Ceiling(_rows.Count / (double)Settings.PageSize))) - 1) * Settings.PageSize).Take(Settings.PageSize);
+
+    private string FilterSummary => Filtered
+        ? $"فیلتر: {(_from is null ? "" : "از " + Fa.Date(_from.Value))} {(_to is null ? "" : "تا " + Fa.Date(_to.Value))} {(_type == "" ? "" : "— " + Fa.TypeName(_type))}"
+        : "همه‌ی سوابق";
+
+    protected override void OnInitialized()
+    {
+        Settings.Changed += OnSettings;
+        base.OnInitialized();
+    }
+
+    protected override TimeSpan? RefreshInterval => null;
+
+    protected override void OnDataChanged()
+    {
+        _rows = Fin.Query(new ExitQuery(null, string.IsNullOrEmpty(_type) ? null : _type, _from, _to, _sort, _desc));
+        _totals = Fin.Totals(_rows);
+        _byType = Fin.RevenueByType(_rows).Select(t => new HBars.Item(t.Name, t.Color, t.Revenue,
+            $"{Fa.Money(t.Revenue)} · {Fa.Number(t.Count)} خروج")).ToList();
+        _daily = Fin.Daily(_rows);
+        _totalAll = Fin.TotalRevenue();
+        _today = Fin.TodayRevenue();
+        _allCount = State.Snapshot().Exits.Count;
+        int pages = Math.Max(1, (int)Math.Ceiling(_rows.Count / (double)Settings.PageSize));
+        if (_page > pages) _page = pages;
+    }
+
+    private void OnSettings() => _ = InvokeAsync(StateHasChanged);
+
+    private void Reload() { _page = 1; OnDataChanged(); }
+
+    private void Preset(int daysBack)
+    {
+        if (daysBack < 0) { _from = null; _to = null; }
+        else { _to = DateTime.Today; _from = DateTime.Today.AddDays(-daysBack); }
+        Reload();
+    }
+
+    private void Sort(string key)
+    {
+        if (_sort == key) _desc = !_desc;
+        else { _sort = key; _desc = key is "fee" or "exit" or "duration"; }
+        _page = 1;
+        OnDataChanged();
+    }
+
+    private Task Export()
+        => Browser.DownloadTextAsync($"smartparking-financial-{DateTime.Now:yyyyMMdd-HHmm}.csv", Fin.BuildCsv(_rows));
+
+    private async Task PrintReport()
+    {
+        _showAll = true;
+        StateHasChanged();
+        await Task.Delay(300);
+        await Browser.PrintAsync();
+        _showAll = false;
+    }
+
+    public override void Dispose()
+    {
+        Settings.Changed -= OnSettings;
+        base.Dispose();
+    }
+}

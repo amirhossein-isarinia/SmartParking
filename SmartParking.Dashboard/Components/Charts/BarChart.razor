@@ -1,0 +1,90 @@
+@* نمودار ستونی SVG؛ بدون کتابخانه‌ی خارجی. جهت زمان از راست به چپ (قدیمی‌ترین در سمت راست). *@
+<div class="chart-box" style="--h:@(Height)px">
+    <svg class="chart-svg" viewBox="0 0 @W @Height" preserveAspectRatio="none" role="img" aria-label="@Label">
+        @foreach (var tick in Ticks())
+        {
+            <line class="gridline" x1="@PadL" x2="@(W - PadR)" y1="@F(tick.Y)" y2="@F(tick.Y)" />
+            @Txt("axis", W - PadR + 8, tick.Y + 4, Formatter(tick.Value))
+        }
+
+        @for (int i = 0; i < Points.Count; i++)
+        {
+            int idx = i;
+            double cx = CenterX(i);
+            double h = Points[i].Value <= 0 ? 0 : (double)Points[i].Value / (double)Max * PlotH;
+            <g @onmouseenter="() => _hover = idx" @onmouseleave="() => _hover = -1">
+                <rect class="hit" x="@F(cx - Slot / 2)" y="@PadT" width="@F(Slot)" height="@F(PlotH)" />
+                @if (h > 0)
+                {
+                    <rect class="bar @(_hover == i ? "is-hover" : "")" x="@F(cx - BarW / 2)" y="@F(PadT + PlotH - h)" width="@F(BarW)" height="@F(h)" rx="@F(Math.Min(5, BarW / 2))" />
+                }
+                else
+                {
+                    <rect class="bar-zero" x="@F(cx - BarW / 2)" y="@F(PadT + PlotH - 2)" width="@F(BarW)" height="2" rx="1" />
+                }
+                @if (i % LabelEvery == 0)
+                {
+                    @Txt("axis axis-x", cx, Height - 8, Points[i].Label, "middle")
+                }
+            </g>
+        }
+    </svg>
+
+    @if (_hover >= 0 && _hover < Points.Count)
+    {
+        <div class="chart-tip" style="left:@F(CenterX(_hover) / W * 100)%">@Points[_hover].Tooltip</div>
+    }
+
+    @if (Points.Count == 0 || Points.All(p => p.Value <= 0))
+    {
+        <div class="chart-empty">@EmptyText</div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<ChartPoint> Points { get; set; } = Array.Empty<ChartPoint>();
+    [Parameter] public int Height { get; set; } = 260;
+    [Parameter] public string Label { get; set; } = "نمودار";
+    [Parameter] public string EmptyText { get; set; } = "داده‌ای برای نمایش وجود ندارد.";
+    [Parameter] public Func<decimal, string> Formatter { get; set; } = v => Fa.Number(v);
+
+    private const int W = 760;
+    private const double PadL = 10, PadR = 76, PadT = 14, PadB = 28;
+    private int _hover = -1;
+
+    private double PlotH => Height - PadT - PadB;
+    private double PlotW => W - PadL - PadR;
+    private double Slot => Points.Count == 0 ? PlotW : PlotW / Points.Count;
+    private double BarW => Math.Min(38, Slot * 0.62);
+    private int LabelEvery => Math.Max(1, (int)Math.Ceiling(Points.Count / 12.0));
+
+    private decimal Max => NiceMax(Points.Count == 0 ? 0 : Points.Max(p => p.Value));
+
+    // قدیمی‌ترین نقطه در سمت راست (مناسب خواندن راست‌به‌چپ)
+    private double CenterX(int i) => PadL + PlotW - (i + 0.5) * Slot;
+
+    private static MarkupString Txt(string cls, double x, double y, string text, string? anchor = null)
+        => new($"<text class=\"{cls}\" x=\"{F(x)}\" y=\"{F(y)}\"{(anchor is null ? "" : $" text-anchor=\"{anchor}\"")}>{System.Net.WebUtility.HtmlEncode(text)}</text>");
+
+    private static string F(double v) => v.ToString("0.##", CultureInfo.InvariantCulture);
+
+    private IEnumerable<(double Y, decimal Value)> Ticks()
+    {
+        decimal max = Max;
+        for (int i = 0; i <= 4; i++)
+        {
+            decimal value = max * i / 4m;
+            yield return (PadT + PlotH - PlotH * i / 4.0, value);
+        }
+    }
+
+    private static decimal NiceMax(decimal value)
+    {
+        if (value <= 0) return 4;
+        double exp = Math.Floor(Math.Log10((double)value));
+        double pow = Math.Pow(10, exp);
+        double f = (double)value / pow;
+        double nice = f <= 1 ? 1 : f <= 2 ? 2 : f <= 4 ? 4 : f <= 8 ? 8 : 10;
+        return (decimal)(nice * pow);
+    }
+}

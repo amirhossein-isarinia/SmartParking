@@ -1,0 +1,53 @@
+@if (Total > 0)
+{
+    <div class="pager no-print">
+        <span class="pager-info">نمایش @Fa.Number(From) تا @Fa.Number(To) از @Fa.Number(Total)</span>
+        @if (PageCount > 1)
+        {
+            <div class="pager-buttons">
+                <button type="button" class="icon-btn" aria-label="صفحه‌ی قبل" disabled="@(Page <= 1)" @onclick="() => Go(Page - 1)"><Icon Name="chev-right" Size="16" /></button>
+                @foreach (int p in Pages())
+                {
+                    if (p == 0)
+                    {
+                        <span class="pager-gap">…</span>
+                    }
+                    else
+                    {
+                        int target = p;
+                        <button type="button" class="pager-num @(p == Page ? "is-active" : "")" aria-current="@(p == Page ? "page" : null)" @onclick="() => Go(target)">@Fa.Number(p)</button>
+                    }
+                }
+                <button type="button" class="icon-btn" aria-label="صفحه‌ی بعد" disabled="@(Page >= PageCount)" @onclick="() => Go(Page + 1)"><Icon Name="chev-left" Size="16" /></button>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public int Total { get; set; }
+    [Parameter] public int Page { get; set; } = 1;
+    [Parameter] public int PageSize { get; set; } = 10;
+    [Parameter] public EventCallback<int> PageChanged { get; set; }
+
+    private int PageCount => Math.Max(1, (int)Math.Ceiling(Total / (double)PageSize));
+    private int From => Total == 0 ? 0 : (Page - 1) * PageSize + 1;
+    private int To => Math.Min(Total, Page * PageSize);
+
+    private Task Go(int page) => PageChanged.InvokeAsync(Math.Clamp(page, 1, PageCount));
+
+    private IEnumerable<int> Pages()
+    {
+        if (PageCount <= 7)
+        {
+            for (int i = 1; i <= PageCount; i++) yield return i;
+            yield break;
+        }
+
+        yield return 1;
+        if (Page > 3) yield return 0;
+        for (int i = Math.Max(2, Page - 1); i <= Math.Min(PageCount - 1, Page + 1); i++) yield return i;
+        if (Page < PageCount - 2) yield return 0;
+        yield return PageCount;
+    }
+}

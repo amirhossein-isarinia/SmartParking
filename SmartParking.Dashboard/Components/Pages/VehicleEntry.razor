@@ -1,0 +1,270 @@
+@page "/vehicles/entry"
+@inherits LiveComponentBase
+@inject TariffCatalog Tariffs
+
+<PageTitle>ثبت ورود | SmartParking</PageTitle>
+
+<PageHeader Title="ثبت ورود وسیله نقلیه" Subtitle="اطلاعات را وارد کنید؛ ثبت از طریق همان منطق اصلی پارکینگ انجام می‌شود" />
+
+<div class="grid grid-form">
+    <section class="panel">
+        @if (_success is not null)
+        {
+            <Notice Kind="ok">
+                <strong>ورود ثبت شد.</strong>
+                <span><PlateTag Plate="@_success.LicensePlate" /> · @Fa.TypeName(_success.VehicleTypeName) · @Fa.Stamp(_success.EntryTime)</span>
+                <span class="notice-actions">
+                    <a class="btn btn-ghost btn-sm" href="vehicles">مشاهده وسایل حاضر</a>
+                </span>
+            </Notice>
+        }
+
+        @if (_formError is not null)
+        {
+            <Notice Kind="err">@_formError</Notice>
+        }
+        else if (_snap.IsFull)
+        {
+            <Notice Kind="err">ظرفیت پارکینگ تکمیل است؛ تا خروج یک وسیله، ثبت ورود جدید ممکن نیست.</Notice>
+        }
+
+        <form @onsubmit="Submit" novalidate>
+            <fieldset class="form-section" disabled="@_busy">
+                <legend>نوع وسیله نقلیه</legend>
+                <div class="type-picker" role="radiogroup" aria-label="نوع وسیله نقلیه">
+                    @foreach (var t in VehicleTypes.All)
+                    {
+                        <button type="button" role="radio" aria-checked="@(_type == t.Key ? "true" : "false")"
+                                class="type-opt @(_type == t.Key ? "is-active" : "")" style="--c:@t.Color"
+                                @onclick="() => SelectType(t.Key)">
+                            <Icon Name="@t.Icon" Size="22" />
+                            <span>@t.Name</span>
+                        </button>
+                    }
+                </div>
+            </fieldset>
+
+            <fieldset class="form-section" disabled="@_busy">
+                <legend>اطلاعات عمومی</legend>
+                <div class="form-grid">
+                    <label class="field @(Has("plate") ? "has-error" : "")">
+                        <span class="field-label">پلاک</span>
+                        <input class="input plate-input" dir="ltr" autocomplete="off" maxlength="40" placeholder="مثال: 12-345-67" @bind="_plate" @bind:event="oninput" aria-invalid="@Has("plate")" />
+                        <span class="field-error">@Err("plate")</span>
+                    </label>
+
+                    <label class="field @(Has("owner") ? "has-error" : "")">
+                        <span class="field-label">نام مالک</span>
+                        <input class="input" autocomplete="off" maxlength="60" @bind="_owner" @bind:event="oninput" aria-invalid="@Has("owner")" />
+                        <span class="field-error">@Err("owner")</span>
+                    </label>
+
+                    <label class="field @(Has("time") ? "has-error" : "")">
+                        <span class="field-label">زمان ورود</span>
+                        <span class="input-with-btn">
+                            <input class="input" type="datetime-local" value="@_entryTime" @oninput="e => _entryTime = e.Value?.ToString() ?? string.Empty" aria-invalid="@Has("time")" />
+                            <button type="button" class="btn btn-ghost btn-sm" @onclick="SetNow">اکنون</button>
+                        </span>
+                        <span class="field-hint">@JalaliHint(_entryTime)</span>
+                        <span class="field-error">@Err("time")</span>
+                    </label>
+
+                    <div class="field">
+                        <span class="field-label">وضعیت اشتراک</span>
+                        <label class="switch">
+                            <input type="checkbox" @bind="_vip" />
+                            <span class="switch-ui" aria-hidden="true"></span>
+                            <span>مشترک VIP <em class="muted">(@Fa.Percent((double)(Tariffs.VipDiscountRate * 100)) تخفیف)</em></span>
+                        </label>
+                    </div>
+                </div>
+            </fieldset>
+
+            <fieldset class="form-section" disabled="@_busy">
+                <legend>اطلاعات اختصاصی @Fa.TypeName(_type)</legend>
+                <div class="form-grid">
+                    @switch (_type)
+                    {
+                        case "Car":
+                            <label class="field @(Has("doors") ? "has-error" : "")">
+                                <span class="field-label">تعداد درب</span>
+                                <input class="input" inputmode="numeric" placeholder="بین ۲ تا ۵" @bind="_doors" @bind:event="oninput" />
+                                <span class="field-error">@Err("doors")</span>
+                            </label>
+                            break;
+                        case "Motorcycle":
+                            <label class="field @(Has("cc") ? "has-error" : "")">
+                                <span class="field-label">حجم موتور (سی‌سی)</span>
+                                <input class="input" inputmode="numeric" placeholder="بین ۵۰ تا ۲۰۰۰" @bind="_cc" @bind:event="oninput" />
+                                <span class="field-error">@Err("cc")</span>
+                            </label>
+                            break;
+                        case "Truck":
+                            <label class="field @(Has("tons") ? "has-error" : "")">
+                                <span class="field-label">ظرفیت بار (تن)</span>
+                                <input class="input" inputmode="decimal" placeholder="بیشتر از ۰ و حداکثر ۱۰۰" @bind="_tons" @bind:event="oninput" />
+                                <span class="field-error">@Err("tons")</span>
+                            </label>
+                            break;
+                        case "ElectricCar":
+                            <label class="field @(Has("kwh") ? "has-error" : "")">
+                                <span class="field-label">ظرفیت باتری (کیلووات‌ساعت)</span>
+                                <input class="input" inputmode="decimal" placeholder="بیشتر از ۰ و حداکثر ۳۰۰" @bind="_kwh" @bind:event="oninput" />
+                                <span class="field-error">@Err("kwh")</span>
+                            </label>
+                            <div class="field">
+                                <span class="field-label">شارژر پارکینگ</span>
+                                <label class="switch">
+                                    <input type="checkbox" @bind="_charger" />
+                                    <span class="switch-ui" aria-hidden="true"></span>
+                                    <span>استفاده از شارژر پارکینگ</span>
+                                </label>
+                            </div>
+                            break;
+                        case "Bus":
+                            <label class="field @(Has("seats") ? "has-error" : "")">
+                                <span class="field-label">تعداد صندلی</span>
+                                <input class="input" inputmode="numeric" placeholder="بین ۱۰ تا ۱۰۰" @bind="_seats" @bind:event="oninput" />
+                                <span class="field-error">@Err("seats")</span>
+                            </label>
+                            break;
+                    }
+                </div>
+            </fieldset>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary btn-lg" disabled="@(_busy || _snap.IsFull)">
+                    <Icon Name="login" Size="18" />@(_busy ? "در حال ثبت..." : "ثبت ورود")
+                </button>
+                <a class="btn btn-ghost btn-lg" href="vehicles">انصراف</a>
+            </div>
+        </form>
+    </section>
+
+    <aside class="side-stack">
+        <section class="panel">
+            <h2 class="panel-title">وضعیت ظرفیت</h2>
+            <div class="cap-figures cap-figures-2">
+                <div><span>حاضر</span><strong>@Fa.Number(_snap.ParkedCount)</strong></div>
+                <div><span>خالی</span><strong>@Fa.Number(_snap.FreeCount)</strong></div>
+            </div>
+            <div class="meter"><span class="meter-fill lv-@CapacityLevels.Css(Level)" style="width:@(_snap.OccupancyPercent.ToString("0.#", CultureInfo.InvariantCulture))%"></span></div>
+            <p class="panel-sub">@CapacityLevels.Label(Level) · @Fa.Percent(_snap.OccupancyPercent) اشغال</p>
+        </section>
+
+        <section class="panel">
+            <h2 class="panel-title">تعرفه‌ی @Fa.TypeName(_type)</h2>
+            @{ var tariff = Tariffs.Get(_type); }
+            <dl class="kv">
+                <div><dt>ساعت اول</dt><dd>@Fa.Money(tariff.FirstHour)</dd></div>
+                <div><dt>هر ساعت اضافه</dt><dd>@Fa.Money(tariff.AdditionalHour)</dd></div>
+            </dl>
+            @foreach (var note in tariff.Notes)
+            {
+                <p class="note-line">@note</p>
+            }
+            <p class="note-line">تخفیف VIP: @Fa.Percent((double)(Tariffs.VipDiscountRate * 100))</p>
+        </section>
+    </aside>
+</div>
+
+@code {
+    private ParkingSnapshot _snap = default!;
+    private CapacityLevel Level => CapacityLevels.Of(_snap.OccupancyPercent, _snap.IsFull);
+
+    private string _type = "Car";
+    private string _plate = string.Empty, _owner = string.Empty;
+    private string _entryTime = Fa.ToInputValue(DateTime.Now);
+    private bool _vip, _charger, _busy;
+    private string _doors = "4", _cc = "150", _tons = string.Empty, _kwh = string.Empty, _seats = string.Empty;
+
+    private readonly Dictionary<string, string> _errors = new();
+    private string? _formError;
+    private Vehicle? _success;
+
+    protected override TimeSpan? RefreshInterval => null;
+
+    protected override void OnDataChanged() => _snap = State.Snapshot();
+
+    private bool Has(string field) => _errors.ContainsKey(field);
+    private string? Err(string field) => _errors.TryGetValue(field, out var m) ? m : null;
+
+    private void SelectType(string key)
+    {
+        _type = key;
+        _errors.Clear();
+        _formError = null;
+    }
+
+    private static string JalaliHint(string input)
+        => Fa.TryParseInputDateTime(input, out DateTime d) ? "معادل شمسی: " + Fa.Stamp(d) : " ";
+
+    private void SetNow() => _entryTime = Fa.ToInputValue(DateTime.Now);
+
+    private bool ValidateInputs(out DateTime entry, out VehicleSpecs specs)
+    {
+        _errors.Clear();
+        entry = default;
+        int doors = 4, cc = 150, seats = 40;
+        decimal tons = 1, kwh = 50;
+
+        if (string.IsNullOrWhiteSpace(_plate)) _errors["plate"] = "پلاک را وارد کنید.";
+        if (string.IsNullOrWhiteSpace(_owner)) _errors["owner"] = "نام مالک را وارد کنید.";
+
+        if (!Fa.TryParseInputDateTime(_entryTime, out entry))
+            _errors["time"] = "زمان ورود را به‌صورت معتبر وارد کنید.";
+        else if (entry > DateTime.Now)
+            _errors["time"] = "زمان ورود نمی‌تواند در آینده باشد.";
+
+        switch (_type)
+        {
+            case "Car": if (!Fa.TryParseInt(_doors, out doors)) _errors["doors"] = "تعداد درب را به‌صورت عدد صحیح وارد کنید."; break;
+            case "Motorcycle": if (!Fa.TryParseInt(_cc, out cc)) _errors["cc"] = "حجم موتور را به‌صورت عدد صحیح وارد کنید."; break;
+            case "Truck": if (!Fa.TryParseDecimal(_tons, out tons)) _errors["tons"] = "ظرفیت بار را به‌صورت عدد وارد کنید."; break;
+            case "ElectricCar": if (!Fa.TryParseDecimal(_kwh, out kwh)) _errors["kwh"] = "ظرفیت باتری را به‌صورت عدد وارد کنید."; break;
+            case "Bus": if (!Fa.TryParseInt(_seats, out seats)) _errors["seats"] = "تعداد صندلی را به‌صورت عدد صحیح وارد کنید."; break;
+        }
+
+        specs = new VehicleSpecs(doors, cc, tons, kwh, _charger, seats);
+        return _errors.Count == 0;
+    }
+
+    private void Submit()
+    {
+        if (_busy) return; // جلوگیری از ثبت چندباره
+        _busy = true;
+        _formError = null;
+        _success = null;
+
+        try
+        {
+            if (!ValidateInputs(out DateTime entry, out VehicleSpecs specs)) return;
+
+            string plate = Fa.NormalizeDigits(_plate);
+            Vehicle vehicle = VehicleFactory.Create(_type, plate, _owner, entry, _vip, specs); // اعتبارسنجی اصلی سازنده‌ها
+            State.RegisterEntry(vehicle);                                                       // ظرفیت و پلاک تکراری در ParkingManager
+
+            _success = vehicle;
+            _plate = _owner = string.Empty;
+            _vip = _charger = false;
+            _tons = _kwh = _seats = string.Empty;
+            _doors = "4"; _cc = "150";
+            SetNow();
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            UiError error = ErrorTranslator.Translate(ex);
+            if (error.Field is null) _formError = error.Message;
+            else _errors[error.Field] = error.Message;
+        }
+        catch (Exception)
+        {
+            _formError = "ثبت ورود انجام نشد. لطفاً دوباره تلاش کنید.";
+        }
+        finally
+        {
+            _busy = false;
+            OnDataChanged();
+        }
+    }
+}

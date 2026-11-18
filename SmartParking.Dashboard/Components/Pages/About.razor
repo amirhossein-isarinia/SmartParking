@@ -1,0 +1,40 @@
+@page "/about"
+@inject NavigationManager Nav
+
+<PageTitle>درباره سیستم | SmartParking</PageTitle>
+
+<PageHeader Title="درباره سیستم" Subtitle="SmartParking — سامانه مدیریت هوشمند پارکینگ" />
+
+<div class="grid grid-even">
+    <section class="panel">
+        <div class="about-brand">
+            <span class="brand-mark brand-mark-lg"><Icon Name="parking" Size="34" /></span>
+            <div>
+                <strong>SmartParking</strong>
+                <small>نسخه‌ی @Fa.Digits(AppInfo.Version)</small>
+            </div>
+        </div>
+        <p>
+            SmartParking ثبت ورود و خروج وسایل نقلیه، محاسبه‌ی هزینه‌ی توقف بر اساس نوع وسیله و اشتراک VIP، و گزارش‌گیری مالی را در یک برنامه انجام می‌دهد.
+            داشبورد، رابط وب همان منطق اصلی برنامه‌ی کنسولی است و هیچ قانون یا فرمولی را دوباره پیاده‌سازی نمی‌کند.
+        </p>
+        <dl class="kv">
+            <div><dt>ظرفیت فعلی</dt><dd>@Fa.Number(ParkingManager.Capacity) وسیله</dd></div>
+            <div><dt>انواع وسیله‌ی پشتیبانی‌شده</dt><dd>@Fa.Number(VehicleTypes.All.Count) نوع</dd></div>
+            <div><dt>ذخیره‌سازی</dt><dd>حافظه‌ی برنامه (موقت)</dd></div>
+        </dl>
+    </section>
+
+    <section class="panel">
+        <h2 class="panel-title">فناوری‌های مورد استفاده</h2>
+        <ul class="plain-list">
+            <li>C# و .NET 10</li>
+            <li>ASP.NET Core و Blazor (Server Interactive)</li>
+            <li>نمودارهای SVG بدون کتابخانه‌ی خارجی</li>
+            <li>فونت وزیرمتن (Vazirmatn) با مجوز OFL</li>
+        </ul>
+        <Notice Kind="info">
+            داده‌ها در حافظه نگهداری می‌شوند و با بستن برنامه پاک می‌شوند. نسخه‌ی کنسولی و داشبورد هر کدام با فرمان مستقل اجرا می‌شوند و داده‌ی هم را نمی‌بینند.
+        </Notice>
+    </section>
+</div>

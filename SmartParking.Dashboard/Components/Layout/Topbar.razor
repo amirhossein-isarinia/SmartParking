@@ -1,0 +1,84 @@
+@inherits LiveComponentBase
+@inject NavigationManager Nav
+
+<header class="topbar no-print">
+    <button type="button" class="icon-btn menu-btn" aria-label="باز و بسته کردن منو" @onclick="OnMenu"><Icon Name="menu" Size="22" /></button>
+
+    <div class="topbar-title">
+        <strong>@Title</strong>
+        <small>@Fa.LongDate(_now)</small>
+    </div>
+
+    <div class="topbar-tools">
+        <span class="status-pill" title="برنامه در حال اجراست"><i class="dot"></i>سیستم فعال</span>
+
+        <span class="cap-chip lv-@CapacityLevels.Css(_level)" title="@CapacityLevels.Label(_level)">
+            <Icon Name="gauge" Size="16" />
+            ظرفیت: @Fa.Number(_parked) از @Fa.Number(_capacity)
+            <em>(@Fa.Number(_free) جای خالی)</em>
+        </span>
+
+        <span class="clock" aria-label="ساعت"><Icon Name="clock" Size="16" /><bdi>@Fa.TimeWithSeconds(_now)</bdi></span>
+
+        @if (!IsDashboard)
+        {
+            <a class="btn btn-ghost btn-sm" href="dashboard"><Icon Name="dashboard" Size="16" />بازگشت به داشبورد</a>
+        }
+    </div>
+</header>
+
+@code {
+    [Parameter] public EventCallback OnMenu { get; set; }
+
+    private int _parked, _capacity, _free;
+    private CapacityLevel _level;
+    private DateTime _now = DateTime.Now;
+    private Timer? _clock;
+
+    protected override TimeSpan? RefreshInterval => null;
+
+    private string RelativePath => Nav.ToBaseRelativePath(Nav.Uri).Split('?', '#')[0].Trim('/').ToLowerInvariant();
+    private bool IsDashboard => RelativePath is "" or "dashboard";
+
+    private string Title => RelativePath switch
+    {
+        "" or "dashboard" => "داشبورد اصلی",
+        "vehicles" => "وسایل نقلیه حاضر",
+        "vehicles/entry" => "ثبت ورود",
+        "vehicles/exit" => "ثبت خروج",
+        "search" => "جست‌وجوی پلاک",
+        "reports/financial" => "گزارش‌های مالی",
+        "analytics" => "آمار و تحلیل",
+        "history" => "تاریخچه خروج‌ها",
+        "tariffs" => "تعرفه‌ها",
+        "settings" => "تنظیمات",
+        "about" => "درباره سیستم",
+        _ => "SmartParking"
+    };
+
+    protected override void OnDataChanged()
+    {
+        ParkingSnapshot s = State.Snapshot();
+        _parked = s.ParkedCount;
+        _capacity = s.Capacity;
+        _free = s.FreeCount;
+        _level = CapacityLevels.Of(s.OccupancyPercent, s.IsFull);
+    }
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Nav.LocationChanged += OnLocation;
+        _clock = new Timer(_ => _ = InvokeAsync(() => { _now = DateTime.Now; StateHasChanged(); }), null, 1000, 1000);
+    }
+
+    private void OnLocation(object? s, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+        => _ = InvokeAsync(StateHasChanged);
+
+    public override void Dispose()
+    {
+        Nav.LocationChanged -= OnLocation;
+        _clock?.Dispose();
+        base.Dispose();
+    }
+}

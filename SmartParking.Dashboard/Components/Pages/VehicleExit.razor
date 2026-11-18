@@ -1,0 +1,340 @@
+@page "/vehicles/exit"
+@inherits LiveComponentBase
+@inject FeeBreakdownService Fees
+@inject ReceiptService Receipts
+
+<PageTitle>ثبت خروج | SmartParking</PageTitle>
+
+<PageHeader Title="ثبت خروج وسیله نقلیه" Subtitle="پلاک را جست‌وجو کنید، هزینه را بررسی کنید و خروج را تأیید کنید" />
+
+<div class="grid grid-form">
+    <section class="panel">
+        <form class="search-bar" @onsubmit="Find" novalidate>
+            <label class="field grow">
+                <span class="field-label">پلاک وسیله نقلیه</span>
+                <span class="input-icon">
+                    <Icon Name="search" Size="18" />
+                    <input class="input plate-input" dir="ltr" list="parked-plates" autocomplete="off" placeholder="پلاک را وارد کنید" @bind="_plateInput" @bind:event="oninput" />
+                </span>
+            </label>
+            <datalist id="parked-plates">
+                @foreach (var v in _parked)
+                {
+                    <option value="@v.LicensePlate"></option>
+                }
+            </datalist>
+            <button type="submit" class="btn btn-primary">جست‌وجو</button>
+        </form>
+
+        @if (_message is not null)
+        {
+            <Notice Kind="@_messageKind">@_message</Notice>
+        }
+
+        @if (_done is not null)
+        {
+            <Notice Kind="ok">
+                <strong>خروج ثبت شد.</strong>
+                <span><PlateTag Plate="@_done.Vehicle.LicensePlate" /> · مبلغ نهایی: <strong>@Fa.Money(_done.Fee)</strong></span>
+                <span class="notice-actions">
+                    <button type="button" class="btn btn-ghost btn-sm" @onclick="() => Receipts.Show(_done, _doneNumber)"><Icon Name="receipt" Size="15" />مشاهده رسید</button>
+                </span>
+            </Notice>
+        }
+
+        @if (_vehicle is not null)
+        {
+            <div class="vehicle-card">
+                <div class="details-head">
+                    <PlateTag Plate="@_vehicle.LicensePlate" />
+                    <TypeBadge Key="@_vehicle.VehicleTypeName" />
+                    <VipBadge IsVip="@_vehicle.IsVip" />
+                </div>
+                <dl class="kv">
+                    <div><dt>نام مالک</dt><dd>@_vehicle.OwnerName</dd></div>
+                    <div><dt>زمان ورود</dt><dd>@Fa.Stamp(_vehicle.EntryTime)</dd></div>
+                    <div><dt>مدت توقف</dt><dd>@(_fee is null ? "—" : Fa.Duration(_previewTime - _vehicle.EntryTime))</dd></div>
+                    <div><dt>وضعیت اشتراک</dt><dd>@(_vehicle.IsVip ? "VIP" : "عادی")</dd></div>
+                    @foreach (var (label, value) in VehicleFactory.Describe(_vehicle))
+                    {
+                        <div><dt>@label</dt><dd>@value</dd></div>
+                    }
+                </dl>
+            </div>
+
+            <fieldset class="form-section">
+                <legend>زمان خروج</legend>
+                <div class="segmented" role="group" aria-label="زمان خروج">
+                    <button type="button" class="@(_useNow ? "is-active" : "")" @onclick="() => SetUseNow(true)">همین اکنون</button>
+                    <button type="button" class="@(!_useNow ? "is-active" : "")" @onclick="() => SetUseNow(false)">زمان دلخواه</button>
+                </div>
+                @if (!_useNow)
+                {
+                    <label class="field @(_timeError is not null ? "has-error" : "")">
+                        <span class="field-label">زمان خروج</span>
+                        <input class="input" type="datetime-local" value="@_exitInput" @oninput="OnExitInput" />
+                        <span class="field-hint">@JalaliHint(_exitInput)</span>
+                        <span class="field-error">@_timeError</span>
+                    </label>
+                }
+            </fieldset>
+
+            @if (_fee is not null)
+            {
+                <div class="fee-preview">
+                    <h2 class="panel-title">پیش‌نمایش محاسبه‌ی هزینه</h2>
+                    <FeeTable Fee="_fee" />
+                    <p class="panel-sub">هزینه بر اساس زمان @(_useNow ? "فعلی" : "انتخابی") (@Fa.Stamp(_previewTime)) محاسبه شده است. تمام ارقام توسط منطق اصلی پارکینگ تولید می‌شوند.</p>
+                </div>
+            }
+
+            <div class="form-actions">
+                <button type="button" class="btn btn-primary btn-lg" disabled="@(_fee is null || _busy)" @onclick="OpenConfirm">
+                    <Icon Name="logout" Size="18" />ثبت خروج
+                </button>
+            </div>
+        }
+        else if (_done is null && _message is null)
+        {
+            <EmptyState IconName="logout" Title="وسیله‌ای انتخاب نشده است"
+                        Text="@(_parked.Count == 0 ? "در حال حاضر وسیله‌ای در پارکینگ حضور ندارد." : "پلاک را وارد و جست‌وجو کنید یا از فهرست زیر یکی را انتخاب کنید.")" />
+        }
+    </section>
+
+    <aside class="side-stack">
+        <section class="panel">
+            <h2 class="panel-title">وسایل حاضر (@Fa.Number(_parked.Count))</h2>
+            @if (_parked.Count == 0)
+            {
+                <p class="muted">وسیله‌ای حاضر نیست.</p>
+            }
+            else
+            {
+                <ul class="quick-list">
+                    @foreach (var v in _parked.OrderBy(v => v.EntryTime).Take(12))
+                    {
+                        <li>
+                            <button type="button" class="quick-item @(_vehicle?.LicensePlate == v.LicensePlate ? "is-active" : "")" @onclick="() => Pick(v.LicensePlate)">
+                                <PlateTag Plate="@v.LicensePlate" />
+                                <span class="muted">@Fa.TypeName(v.VehicleTypeName)</span>
+                            </button>
+                        </li>
+                    }
+                </ul>
+                @if (_parked.Count > 12)
+                {
+                    <p class="panel-sub">برای بقیه، پلاک را جست‌وجو کنید یا <a href="vehicles">فهرست کامل</a> را ببینید.</p>
+                }
+            }
+        </section>
+    </aside>
+</div>
+
+@if (_confirm && _vehicle is not null && _pendingFee is not null)
+{
+    <ConfirmDialog Title="تأیید ثبت خروج" ConfirmText="تأیید و ثبت خروج" Busy="_busy" OnConfirm="Confirm" OnCancel="CloseConfirm">
+        <p>خروج وسیله‌ی زیر ثبت می‌شود و از فهرست وسایل حاضر حذف خواهد شد:</p>
+        <dl class="kv">
+            <div><dt>پلاک</dt><dd><PlateTag Plate="@_vehicle.LicensePlate" /></dd></div>
+            <div><dt>نوع</dt><dd>@Fa.TypeName(_vehicle.VehicleTypeName)</dd></div>
+            <div><dt>زمان خروج</dt><dd>@Fa.Stamp(_pendingTime)</dd></div>
+            <div><dt>مدت توقف</dt><dd>@Fa.Duration(_pendingTime - _vehicle.EntryTime)</dd></div>
+        </dl>
+        <FeeTable Fee="_pendingFee" />
+        <p class="panel-sub">این عملیات پس از تأیید قابل بازگشت نیست.</p>
+    </ConfirmDialog>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "plate")] public string? PlateQuery { get; set; }
+
+    private IReadOnlyList<Vehicle> _parked = Array.Empty<Vehicle>();
+    private string _plateInput = string.Empty;
+    private string? _lastQuery;
+
+    private Vehicle? _vehicle;
+    private FeeBreakdown? _fee;
+    private DateTime _previewTime = DateTime.Now;
+    private bool _useNow = true;
+    private string _exitInput = Fa.ToInputValue(DateTime.Now);
+    private string? _timeError;
+
+    private string? _message;
+    private string _messageKind = "info";
+    private ExitRecord? _done;
+    private int _doneNumber;
+
+    private bool _confirm, _busy;
+    private DateTime _pendingTime;
+    private FeeBreakdown? _pendingFee;
+
+    protected override void OnParametersSet()
+    {
+        if (PlateQuery != _lastQuery)
+        {
+            _lastQuery = PlateQuery;
+            if (!string.IsNullOrWhiteSpace(PlateQuery))
+            {
+                _plateInput = PlateQuery;
+                Find();
+            }
+        }
+    }
+
+    protected override void OnDataChanged()
+    {
+        _parked = State.Snapshot().Parked;
+
+        if (_vehicle is not null && !_confirm)
+        {
+            if (State.Find(_vehicle.LicensePlate) is null)
+            {
+                _vehicle = null; _fee = null;
+                _message = "این وسیله دیگر در پارکینگ حضور ندارد.";
+                _messageKind = "warn";
+            }
+            else if (_useNow)
+            {
+                Recalculate();
+            }
+        }
+    }
+
+    private void Find()
+    {
+        _done = null; _message = null; _vehicle = null; _fee = null; _timeError = null;
+
+        if (string.IsNullOrWhiteSpace(_plateInput))
+        {
+            _message = "پلاک را وارد کنید.";
+            _messageKind = "warn";
+            return;
+        }
+
+        _vehicle = State.Find(Fa.NormalizeDigits(_plateInput));
+        if (_vehicle is null)
+        {
+            _message = "وسیله‌ای با این پلاک در پارکینگ یافت نشد.";
+            _messageKind = "err";
+            return;
+        }
+
+        _useNow = true;
+        _exitInput = Fa.ToInputValue(DateTime.Now);
+        Recalculate();
+    }
+
+    private static string JalaliHint(string input)
+        => Fa.TryParseInputDateTime(input, out DateTime d) ? "معادل شمسی: " + Fa.Stamp(d) : " ";
+
+    private void OnExitInput(ChangeEventArgs e)
+    {
+        _exitInput = e.Value?.ToString() ?? string.Empty;
+        Recalculate();
+    }
+
+    private void Pick(string plate) { _plateInput = plate; Find(); }
+
+    private void SetUseNow(bool now)
+    {
+        _useNow = now;
+        if (!now) _exitInput = Fa.ToInputValue(DateTime.Now);
+        Recalculate();
+    }
+
+    /// <summary>زمان خروج معتبر را برمی‌گرداند یا پیام خطای فارسی می‌دهد.</summary>
+    private bool TryGetExitTime(out DateTime time)
+    {
+        _timeError = null;
+        time = DateTime.Now;
+        if (_useNow || _vehicle is null) return true;
+
+        if (!Fa.TryParseInputDateTime(_exitInput, out time))
+        {
+            _timeError = "زمان خروج را به‌صورت معتبر وارد کنید.";
+            return false;
+        }
+        if (time < _vehicle.EntryTime)
+        {
+            _timeError = "زمان خروج نمی‌تواند قبل از زمان ورود باشد.";
+            return false;
+        }
+        if (time > DateTime.Now.AddMinutes(1))
+        {
+            _timeError = "زمان خروج نمی‌تواند در آینده باشد.";
+            return false;
+        }
+        return true;
+    }
+
+    private void Recalculate()
+    {
+        _fee = null;
+        if (_vehicle is null) return;
+        if (!TryGetExitTime(out DateTime time)) return;
+
+        try
+        {
+            _fee = Fees.Calculate(_vehicle, time);
+            _previewTime = time;
+        }
+        catch (ArgumentException ex)
+        {
+            _timeError = ErrorTranslator.Translate(ex).Message;
+        }
+    }
+
+    private void OpenConfirm()
+    {
+        if (_vehicle is null || _busy) return;
+        if (!TryGetExitTime(out DateTime time)) return;
+
+        try
+        {
+            _pendingTime = time;
+            _pendingFee = Fees.Calculate(_vehicle, time);
+            _confirm = true;
+        }
+        catch (ArgumentException ex)
+        {
+            _timeError = ErrorTranslator.Translate(ex).Message;
+        }
+    }
+
+    private void CloseConfirm() { if (!_busy) _confirm = false; }
+
+    private void Confirm()
+    {
+        if (_busy || _vehicle is null) return;
+        _busy = true;
+        string plate = _vehicle.LicensePlate;
+        try
+        {
+            ExitRecord record = State.RegisterExit(plate, _pendingTime); // متد اصلی RegisterExit
+            _done = record;
+            _doneNumber = State.NumberOf(record);
+            _vehicle = null; _fee = null; _message = null;
+            _plateInput = string.Empty;
+            _confirm = false;
+            Receipts.Show(record, _doneNumber);
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            _message = ErrorTranslator.Translate(ex).Message;
+            _messageKind = "err";
+            _confirm = false;
+            _vehicle = State.Find(plate);
+            if (_vehicle is null) _fee = null; else Recalculate();
+        }
+        catch (Exception)
+        {
+            _message = "ثبت خروج انجام نشد. لطفاً دوباره تلاش کنید.";
+            _messageKind = "err";
+            _confirm = false;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

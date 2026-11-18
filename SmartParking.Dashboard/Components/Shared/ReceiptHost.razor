@@ -1,0 +1,24 @@
+@implements IDisposable
+@inject ReceiptService Receipts
+@inject BrowserService Browser
+
+@if (Receipts.Current is ExitRecord record)
+{
+    <Modal Title="رسید خروج" Class="receipt-host" OnClose="Receipts.Close">
+        <ChildContent><ReceiptView Record="record" Number="Receipts.Number" /></ChildContent>
+        <Footer>
+            <button type="button" class="btn btn-ghost" @onclick="Receipts.Close">بستن</button>
+            <button type="button" class="btn btn-primary" @onclick="Print"><Icon Name="printer" Size="16" />چاپ رسید</button>
+        </Footer>
+    </Modal>
+}
+
+@code {
+    protected override void OnInitialized() => Receipts.Changed += OnChanged;
+
+    private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private Task Print() => Browser.PrintAsync("receipt");
+
+    public void Dispose() => Receipts.Changed -= OnChanged;
+}

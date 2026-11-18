@@ -1,0 +1,14 @@
+<label class="field date-field">
+    <span class="field-label">@Label</span>
+    <input type="date" class="input" value="@(Value is null ? string.Empty : Fa.ToInputDate(Value.Value))" @onchange="Changed" />
+    <span class="field-hint">@(Value is null ? "بدون محدودیت" : "معادل شمسی: " + Fa.Date(Value.Value))</span>
+</label>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+    [Parameter] public DateTime? Value { get; set; }
+    [Parameter] public EventCallback<DateTime?> ValueChanged { get; set; }
+
+    private Task Changed(ChangeEventArgs e)
+        => ValueChanged.InvokeAsync(Fa.TryParseInputDate(e.Value?.ToString(), out var d) ? d : null);
+}
